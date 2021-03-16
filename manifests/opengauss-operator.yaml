@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opengauss-operator
+  labels:
+    application: opengauss-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: opengauss-operator
+  template:
+    metadata:
+      labels:
+        name: opengauss-operator
+    spec:
+      serviceAccountName: opengauss-operator
+      containers:
+      - name: opengauss-operator
+        image: waterme7on/opengauss-operator:test
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 100m
+            memory: 250Mi
+          limits:
+            cpu: 500m
+            memory: 500Mi

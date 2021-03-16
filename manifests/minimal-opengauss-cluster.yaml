@@ -1,0 +1,10 @@
+apiVersion: "ljt.do/v1"
+kind: opengauss
+metadata:
+  name: test-opengauss
+spec:
+  image: opengauss:debug
+  imagePullPolicy: IfNotPresent
+  opengauss:
+    master: 1
+    replicas: 0
