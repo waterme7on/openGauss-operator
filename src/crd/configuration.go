@@ -1,13 +1,15 @@
 package crd
 
+import "encoding/json"
+
 // OpenGauss runtime object
 type OpenGaussConfiguration struct {
 	// apiVersion                       string `json:"apiVersion"`
 	// kind                             string `json:"kind"`
-	TypeMetaApplyConfiguration   `json:",inline"`
-	ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                         *OpenGaussSpecConfiguration   `json:"spec,omitempty"`
-	Status                       *OpenGaussStatusConfiguration `json:"status,omitempty"`
+	TypeMeata  *TypeMetaApplyConfiguration   `json:",inline"`
+	ObjectMeta *ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec       *OpenGaussSpecConfiguration   `json:"spec,omitempty"`
+	Status     *OpenGaussStatusConfiguration `json:"status,omitempty"`
 }
 
 type OpenGaussSpecConfiguration struct {
@@ -27,7 +29,21 @@ type OpenGaussStatusConfiguration struct {
 }
 
 type OpenGaussListConfiguration struct {
-	TypeMetaApplyConfiguration   `json:",inline"`
-	ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	OgList                       []OpenGaussConfiguration `json:"items"`
+	TypeMeata  *TypeMetaApplyConfiguration   `json:",inline"`
+	ObjectMeta *ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	OgList     []OpenGaussConfiguration      `json:"items"`
+}
+
+type Configuration interface {
+	String() string
+}
+
+func (config *OpenGaussConfiguration) String() string {
+	ret, _ := json.Marshal(config)
+	return string(ret)
+}
+
+func (config *OpenGaussListConfiguration) String() string {
+	ret, _ := json.Marshal(config)
+	return string(ret)
 }
