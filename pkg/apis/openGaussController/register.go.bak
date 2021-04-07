@@ -1,0 +1,5 @@
+package openGaussController
+
+const (
+	GroupName = "ljt.do"
+)
