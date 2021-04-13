@@ -1,0 +1,10 @@
+apiVersion: "melo.k8s.do/v1"
+kind: OpenGauss
+metadata:
+  name: test-opengauss
+spec:
+  image: opengauss:debug
+  imagePullPolicy: IfNotPresent
+  opengauss:
+    master: 1
+    replicas: 0
