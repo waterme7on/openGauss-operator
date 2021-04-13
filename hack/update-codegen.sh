@@ -34,8 +34,9 @@ bash "${CODEGEN_PKG}"/generate-groups.sh "deepcopy,client,informer,lister" \
   pkg/generated ${PACKAGE_ROOT}/pkg/apis \
   openGaussController:v1 \
   --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt \
-  -o "$(dirname "${BASH_SOURCE[0]}")/../../../.."
-#   --output-base "${SCRIPT_ROOT}"
+  --output-base "${PACKAGE_ROOT}/../../.."
+  # -o ${PACKAGE_ROOT} # output to pkg/apis deepcopy, default value is pkg/apis/group/version/
+
 
 # To use your own boilerplate text append:
 #   --go-header-file "${SCRIPT_ROOT}"/hack/custom-boilerplate.go.txt
