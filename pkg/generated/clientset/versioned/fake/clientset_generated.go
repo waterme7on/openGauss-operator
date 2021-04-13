@@ -20,8 +20,8 @@ package fake
 
 import (
 	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
-	opengausscontrollerv1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1"
-	fakeopengausscontrollerv1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1/fake"
+	melov1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1"
+	fakemelov1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -76,7 +76,7 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 
 var _ clientset.Interface = &Clientset{}
 
-// OpengausscontrollerV1 retrieves the OpengausscontrollerV1Client
-func (c *Clientset) OpengausscontrollerV1() opengausscontrollerv1.OpengausscontrollerV1Interface {
-	return &fakeopengausscontrollerv1.FakeOpengausscontrollerV1{Fake: &c.Fake}
+// MeloV1 retrieves the MeloV1Client
+func (c *Clientset) MeloV1() melov1.MeloV1Interface {
+	return &fakemelov1.FakeMeloV1{Fake: &c.Fake}
 }

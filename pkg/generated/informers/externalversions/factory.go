@@ -172,9 +172,9 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
-	Opengausscontroller() opengausscontroller.Interface
+	Melo() opengausscontroller.Interface
 }
 
-func (f *sharedInformerFactory) Opengausscontroller() opengausscontroller.Interface {
+func (f *sharedInformerFactory) Melo() opengausscontroller.Interface {
 	return opengausscontroller.New(f, f.namespace, f.tweakListOptions)
 }

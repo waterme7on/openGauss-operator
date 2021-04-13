@@ -12,6 +12,6 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
-// +groupName=opengausscontroller
+// +groupName=melo.k8s.do
 
 package v1

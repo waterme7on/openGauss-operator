@@ -64,7 +64,7 @@ func main() {
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().Services(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),
-		exampleInformerFactory.Opengausscontroller().V1().OpenGausses(),
+		exampleInformerFactory.Melo().V1().OpenGausses(),
 	)
 
 	// notice that there is no need to run Start methods in a separate goroutine. (i.e. go kubeInformerFactory.Start(stopCh)

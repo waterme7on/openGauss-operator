@@ -62,13 +62,13 @@ func NewFilteredOpenGaussInformer(client versioned.Interface, namespace string, 
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.OpengausscontrollerV1().OpenGausses(namespace).List(context.TODO(), options)
+				return client.MeloV1().OpenGausses(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.OpengausscontrollerV1().OpenGausses(namespace).Watch(context.TODO(), options)
+				return client.MeloV1().OpenGausses(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&opengausscontrollerv1.OpenGauss{},
