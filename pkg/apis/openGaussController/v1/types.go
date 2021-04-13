@@ -5,36 +5,43 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// HelloType is a top-level type
-type HelloType struct {
+// OpenGauss is a top-level type
+type OpenGauss struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-
 	// +optional
-	Status HelloTypeStatus `json:"status,omitempty"`
-	// This is where you can define
-	// your own custom spec
-	Spec HelloSpec `json:"spec,omitempty"`
+	Status OpenGaussStatus `json:"status,omitempty"`
+	Spec   OpenGaussSpec   `json:"spec,omitempty"`
 }
 
-// custom spec
-type HelloSpec struct {
-	Message string `json:"message,omitempty"`
+type OpenGaussSpec struct {
+	Image           string                         `json:"image"`
+	ImagePullPolicy string                         `json:"imagePullPolicy"`
+	OpenGauss       *OpenGaussClusterConfiguration `json:"opengauss"`
 }
 
-// custom status
-type HelloTypeStatus struct {
-	Name string
+// Define OpenGauss's needs for master and replicas
+type OpenGaussClusterConfiguration struct {
+	Master   int32 `json:"master"`   // Number of Master
+	Replicas int32 `json:"replicas"` // Number of Replicas
+}
+
+// OpenGauss Cluster's status
+type OpenGaussStatus struct {
+	OpenGaussStatus     string `json:"opengaussStatus"`               // OpenGauss if ready or not
+	ReadyMaster         string `json:"readyMaster,omitempty"`         // Ready Master number
+	ReadyReplicas       string `json:"readyReplicas,omitempty"`       // Ready Replicas number
+	MasterStatefulset   string `json:"masterStatefulset,omitempty"`   // name of master statefulset
+	ReplicasStatefulset string `json:"replicasStatefulset,omitempty"` // name of replicas statefulset
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // no client needed for list as it's been created in above
-type HelloTypeList struct {
+type OpenGaussList struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	metav1.ListMeta `son:"metadata,omitempty"`
-
-	Items []HelloType `json:"items"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []OpenGauss `json:"items"`
 }
