@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"time"
 
-	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset"
+	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
 	ogscheme "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/scheme"
-	informers "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/openGaussController/v1"
-	listers "github.com/waterme7on/openGauss-controller/pkg/generated/listers/openGaussController/v1"
+	informers "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/opengausscontroller/v1"
+	listers "github.com/waterme7on/openGauss-controller/pkg/generated/listers/opengausscontroller/v1"
 	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -99,7 +98,7 @@ func NewController(
 		openGaussClientset: openGaussClientset,
 		openGaussLister:    openGaussInformer.Lister(),
 		openGaussSynced:    openGaussInformer.Informer().HasSynced,
-		statefulsetLister:  statefulsetInformer.LIster(),
+		statefulsetLister:  statefulsetInformer.Lister(),
 		statefulsetSynced:  statefulsetInformer.Informer().HasSynced,
 		serviceLister:      serviceInformer.Lister(),
 		serviceSynced:      serviceInformer.Informer().HasSynced,
@@ -165,7 +164,7 @@ func (c *Controller) processNextWorkItem() bool {
 	if shutdown {
 		return false
 	}
-	klog.Info(obj)
+	klog.Info("Object:", obj)
 	return true
 }
 

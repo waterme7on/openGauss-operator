@@ -32,9 +32,9 @@ echo package root: $PACKAGE_ROOT
 #                  instead of the $GOPATH directly. For normal projects this can be dropped.
 bash "${CODEGEN_PKG}"/generate-groups.sh "deepcopy,client,informer,lister" \
   ${PACKAGE_ROOT}/pkg/generated ${PACKAGE_ROOT}/pkg/apis \
-  openGaussController:v1 \
+  opengausscontroller:v1 \
   --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt \
-  --output-base "${SCRIPT_ROOT}/vendor"
+  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.."
   # -o ${PACKAGE_ROOT} # output to pkg/apis deepcopy, default value is pkg/apis/group/version/
 
 
