@@ -31,10 +31,10 @@ echo package root: $PACKAGE_ROOT
 #                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
 #                  instead of the $GOPATH directly. For normal projects this can be dropped.
 bash "${CODEGEN_PKG}"/generate-groups.sh "deepcopy,client,informer,lister" \
-  pkg/generated ${PACKAGE_ROOT}/pkg/apis \
+  ${PACKAGE_ROOT}/pkg/generated ${PACKAGE_ROOT}/pkg/apis \
   openGaussController:v1 \
   --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt \
-  --output-base "${PACKAGE_ROOT}/../../.."
+  --output-base "${SCRIPT_ROOT}/vendor"
   # -o ${PACKAGE_ROOT} # output to pkg/apis deepcopy, default value is pkg/apis/group/version/
 
 
