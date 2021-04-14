@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
@@ -9,6 +11,7 @@ import (
 	informers "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/opengausscontroller/v1"
 	listers "github.com/waterme7on/openGauss-controller/pkg/generated/listers/opengausscontroller/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -108,7 +111,7 @@ func NewController(
 		recorder:           recorder,
 	}
 
-	klog.Info("Setting up event handlers")
+	klog.Infoln("Setting up event handlers")
 	// Set up event handler for OpenGauss
 	openGaussInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueOpenGauss,
@@ -128,24 +131,24 @@ func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
 	defer c.workqueue.ShutDown()
 
 	// start the informer factories to begin populating the informer caches
-	klog.Info("Starting openGauss controller")
+	klog.Infoln("Starting openGauss controller")
 
 	// wait for the caches to be synced before starting workers
-	klog.Info("Syncing informers' caches")
+	klog.Infoln("Syncing informers' caches")
 	if ok := cache.WaitForCacheSync(stopCh, c.statefulsetSynced, c.serviceSynced, c.configMapSynced, c.openGaussSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
 	// starting workers
-	klog.Info("Starting workers")
+	klog.Infoln("Starting workers")
 	// Launch workers to process OpenGauss Resources
 	for i := 0; i < threadiness; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
-	klog.Info("Started workers")
+	klog.Infoln("Started workers")
 	<-stopCh
-	klog.Info("Shutting down workers")
+	klog.Infoln("Shutting down workers")
 
 	return nil
 }
@@ -164,7 +167,13 @@ func (c *Controller) processNextWorkItem() bool {
 	if shutdown {
 		return false
 	}
-	klog.Info("Object:", obj)
+	objStr := fmt.Sprintf("%v", obj)
+	splitRes := strings.Split(objStr, "/")
+	ns := splitRes[0]
+	name := splitRes[1]
+	og, _ := c.openGaussClientset.MeloV1().OpenGausses(ns).Get(context.TODO(), name, v1.GetOptions{})
+	klog.Infoln("Object:", og)
+	klog.Infoln("Status: Ready or not - ", og.IsReady())
 	return true
 }
 
