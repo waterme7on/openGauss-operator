@@ -10,6 +10,7 @@ import (
 	ogscheme "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/scheme"
 	informers "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/opengausscontroller/v1"
 	listers "github.com/waterme7on/openGauss-controller/pkg/generated/listers/opengausscontroller/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -120,6 +121,18 @@ func NewController(
 		},
 	})
 
+	statefulsetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.handleObjects,
+		UpdateFunc: func(old, new interface{}) {
+			newSts := new.(*appsv1.StatefulSet)
+			oldSts := old.(*appsv1.StatefulSet)
+			if newSts.ResourceVersion == oldSts.APIVersion {
+				return
+			}
+			controller.handleObjects(new)
+		},
+	})
+
 	return controller
 }
 
@@ -167,14 +180,57 @@ func (c *Controller) processNextWorkItem() bool {
 	if shutdown {
 		return false
 	}
-	objStr := fmt.Sprintf("%v", obj)
-	splitRes := strings.Split(objStr, "/")
-	ns := splitRes[0]
-	name := splitRes[1]
-	og, _ := c.openGaussClientset.MeloV1().OpenGausses(ns).Get(context.TODO(), name, v1.GetOptions{})
-	klog.Infoln("Object:", og)
-	klog.Infoln("Status: Ready or not - ", og.IsReady())
+
+	// wrap this block in a func so we can defer c.workqueue.Done
+	err := func(obj interface{}) error {
+		// call Done here so that workqueue knows that the item have been processed
+		defer c.workqueue.Done(obj)
+		// We expect strings to come off the workqueue. These are of the form namespace/name.
+		// We do this as the delayed nature of the workqueue means the items in the informer cache may actually be
+		// more up to date that when the item was initially put onto the workqueue.
+		var key string
+		var ok bool
+		if key, ok = obj.(string); !ok {
+			// As the item in the workqueue is actually invalid, we call
+			// Forget here else we'd go into a loop of attempting to
+			// process a work item that is invalid.
+			c.workqueue.Forget(obj)
+			utilruntime.HandleError(fmt.Errorf("expected string in workqueue but got %#v", obj))
+			return nil
+		}
+		// run syncHandler, passing the string  "namespace/name" of opengauss to be synced
+		// TODO: syncHandler
+		// here simply print out the object
+		objStr := fmt.Sprintf("%v", obj)
+		splitRes := strings.Split(objStr, "/")
+		ns := splitRes[0]
+		name := splitRes[1]
+		og, _ := c.openGaussClientset.MeloV1().OpenGausses(ns).Get(context.TODO(), name, v1.GetOptions{})
+		klog.Infoln("Object:", og)
+		klog.Infoln("Status: Ready or not - ", og.IsReady())
+
+		// if no error occurs, we Forget the items as it has been processed successfully
+		c.workqueue.Forget(obj)
+		klog.Infoln("Successfully synced '%s'", key)
+		return nil
+	}(obj)
+
+	if err != nil {
+		utilruntime.HandleError(err)
+		return true
+	}
 	return true
+}
+
+// syncHandler compares the actual state with the desired and attempt to coverge the two.
+// It then updates the status of OpenGauss
+func (c *Controller) syncHandler(key string) error {
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf(("invalid resource key: %s", key)))
+		return nil
+	}
+	return nil
 }
 
 // enqueueFoo takes a OpenGauss resource and converts it into a namespace/name
@@ -188,4 +244,14 @@ func (c *Controller) enqueueOpenGauss(obj interface{}) {
 		return
 	}
 	c.workqueue.Add(key)
+}
+
+// handdleStatefulsets will take any resource implementing metav1.Object and attempt
+// to find the opengauss resource that owns it.
+// It does this by looking at the objects metadata.ownerReferences field for an appropriate OwnerReference
+// It then enqueues that opengauss resource to be processed.
+// If the resource does not have a ownerReference, it will be skipped.
+// TOOD
+func (c *Controller) handleObjects(obj interface{}) {
+	// here do nothing
 }
