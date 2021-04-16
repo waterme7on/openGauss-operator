@@ -214,7 +214,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 									ValueFrom: &corev1.EnvVarSource{
 										FieldRef: &corev1.ObjectFieldSelector{
 											APIVersion: "v1",
-											FieldPath:  "id.podIP",
+											FieldPath:  "status.podIP",
 										},
 									},
 								},
