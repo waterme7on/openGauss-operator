@@ -4,7 +4,10 @@ This files implements helpful utils to manage components of openGauss.
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 
 	v1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
 	"github.com/waterme7on/openGauss-controller/util"
@@ -12,7 +15,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 )
 
 // Identity represents the type of statefulsets
@@ -24,18 +32,18 @@ const (
 	Replicas
 )
 
-// MasterStatefulsets returns master statefulset object
-func MasterStatefulsets(og *v1.OpenGauss) (sts *appsv1.StatefulSet, err error) {
+// NewMasterStatefulsets returns master statefulset object
+func NewMasterStatefulsets(og *v1.OpenGauss) (sts *appsv1.StatefulSet) {
 	return NewStatefulsets(Master, og)
 }
 
-// ReplicaStatefulsets returns replica statefulset object
-func ReplicaStatefulsets(og *v1.OpenGauss) (sts *appsv1.StatefulSet, err error) {
+// NewReplicaStatefulsets returns replica statefulset object
+func NewReplicaStatefulsets(og *v1.OpenGauss) (sts *appsv1.StatefulSet) {
 	return NewStatefulsets(Replicas, og)
 }
 
 // NewStatefulsets returns a statefulset object according to id
-func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet, err error) {
+func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res = statefulsetTemplate()
 	var formatter util.FormatterInterface
 	switch id {
@@ -48,7 +56,6 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet, er
 		res.Spec.Replicas = int32Ptr(og.Spec.OpenGauss.Replicas)
 		break
 	default:
-		err = fmt.Errorf("wrong identity")
 		return
 	}
 	res.Name = formatter.StatefulSetName()
@@ -58,6 +65,39 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet, er
 	res.Spec.Template.Spec.Containers[0].Env[0].Value = formatter.ReplConnInfo()
 	res.Spec.Template.Spec.Volumes[0].ConfigMap.Name = formatter.ConfigMapName()
 	return
+}
+
+type configmap struct {
+	ApiVersion string            `json:"apiVersion"`
+	Data       map[string]string `json:"data"`
+	Kind       string            `json:"kind"`
+	Metadata   map[string]string `json:"metadata"`
+}
+
+// NewConfigMap: return New Configmap as unstructured.Unstructured and configMap Schema
+// modify replConnInfo of configmap data["postgresql.conf"] according to the id of og
+func NewConfigMap(id Identity, og *v1.OpenGauss) (*unstructured.Unstructured, schema.GroupVersionResource) {
+	unstructuredMap := loadConfigMapTemplate()
+	var replConnInfo string
+	if id == Master {
+		replConnInfo = "\nreplconninfo1 = 'localhost=" + og.Name + "-masters-0" + " remotehost=" + og.Name + "-replicas-0" + " localport=5434 localservice=5432 remoteport=5434 remoteservice=5432'\n"
+	} else {
+		replConnInfo = "\nreplconninfo1 = 'localhost=$POD_IP remotehost=" + og.Name + "-masters-0" + " localport=5434 localservice=5432 remoteport=5434 remoteservice=5432'\n"
+	}
+	configMap := &unstructured.Unstructured{Object: unstructuredMap}
+
+	// transform configMap from unstructured to []bytes
+	s, _ := configMap.MarshalJSON()
+	configStruct := configmap{}
+	// transform []bytes to struct configmap to modify Data["postgresql.conf"]
+	json.Unmarshal(s, &configStruct)
+	// add replConnInfo according to og's id
+	configStruct.Data["postgresql.conf"] += replConnInfo
+	s, _ = json.Marshal(configStruct)
+	configMap.UnmarshalJSON(s)
+
+	configMapRes := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+	return configMap, configMapRes
 }
 
 // serviceTemplate returns a service template of type corev1.Service
@@ -160,7 +200,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 									ValueFrom: &corev1.EnvVarSource{
 										FieldRef: &corev1.ObjectFieldSelector{
 											APIVersion: "v1",
-											FieldPath:  "status.podIP",
+											FieldPath:  "id.podIP",
 										},
 									},
 								},
@@ -235,6 +275,26 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 		},
 	}
 	return template
+}
+
+// load configmap file from /config/config.yaml
+func loadConfigMapTemplate() map[string]interface{} {
+
+	// configMap := corev1.ConfigMap{}
+	fileBytes, err := ioutil.ReadFile("/configs/config.yaml")
+	if err != nil {
+		fmt.Println("[error]", err)
+	}
+	decoder := yamlutil.NewYAMLOrJSONDecoder(bytes.NewReader(fileBytes), 100)
+	var rawObj runtime.RawExtension
+	if err = decoder.Decode(&rawObj); err != nil {
+		fmt.Println("[error]", err)
+	}
+	obj, _, err := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme).Decode(rawObj.Raw, nil, nil)
+	unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	// log.Printf("[log] map type:%T\n", unstructuredMap["data"])
+	// log.Println("[log] map: ", unstructuredMap["data"])
+	return unstructuredMap
 }
 
 func int64Ptr(i int64) *int64 { return &i }

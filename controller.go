@@ -6,12 +6,14 @@ import (
 	"strings"
 	"time"
 
+	opengaussv1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
 	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
 	ogscheme "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/scheme"
 	informers "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/opengausscontroller/v1"
 	listers "github.com/waterme7on/openGauss-controller/pkg/generated/listers/opengausscontroller/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -44,7 +46,7 @@ const (
 	MessageResourceExists = "Resource %q already exists and is not managed by OpenGauss"
 	// MessageResourceSynced is the message used for an Event fired when a OpenGauss
 	// is synced successfully
-	MessageResourceSynced = "Foo synced successfully"
+	MessageResourceSynced = "OpenGauss synced successfully"
 )
 
 type Controller struct {
@@ -225,12 +227,103 @@ func (c *Controller) processNextWorkItem() bool {
 // syncHandler compares the actual state with the desired and attempt to coverge the two.
 // It then updates the status of OpenGauss
 func (c *Controller) syncHandler(key string) error {
+	// Convert the namespace/name into a distinct namespace and name
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf(("invalid resource key: %s", key)))
+		utilruntime.HandleError(fmt.Errorf("invalid resource key: %s", key))
 		return nil
 	}
+
+	// Get the openGauss resource with the namespace and name
+	og, err := c.openGaussLister.OpenGausses(namespace).Get(name)
+	if err != nil {
+		// The openGauss object may not exist.
+		if errors.IsNotFound(err) {
+			utilruntime.HandleError(fmt.Errorf("openGauss '%s' in work queue no longer exists", key))
+			return nil
+		}
+		return err
+	}
+
+	// check the master state
+	masterStatefulSetName := og.Status.MasterStatefulset
+	var masterStatefulset *appsv1.StatefulSet
+	if masterStatefulSetName == "" {
+		// haven't deployed master
+		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Create(context.TODO(), NewMasterStatefulsets(og), v1.CreateOptions{})
+	} else {
+		// already deployed replicas
+		masterStatefulset, err = c.statefulsetLister.StatefulSets(og.Namespace).Get(masterStatefulSetName)
+	}
+	// If an error occurs during Get/Create, we'll requeue the item so we can
+	// attempt processing again later. This could have been caused by a
+	// temporary network failure, or any other transient reason.
+	if err != nil {
+		return err
+	}
+
+	// check the replica state
+	replicaStatefulsetName := og.Status.ReplicasStatefulset
+	var replicasStatefulset *appsv1.StatefulSet
+	if replicaStatefulsetName == "" {
+		// haven't deployed replicas
+		replicasStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Create(context.TODO(), NewReplicaStatefulsets(og), v1.CreateOptions{})
+	} else {
+		// already deployed replicas
+		replicasStatefulset, err = c.statefulsetLister.StatefulSets(og.Namespace).Get(replicaStatefulsetName)
+	}
+	// If an error occurs during Get/Create, we'll requeue the item so we can
+	// attempt processing again later. This could have been caused by a
+	// temporary network failure, or any other transient reason.
+	if err != nil {
+		return err
+	}
+
+	// checked if statefulsets are controlled by this og resource
+	if !v1.IsControlledBy(masterStatefulset, og) {
+		msg := fmt.Sprintf(MessageResourceExists, masterStatefulSetName)
+		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
+		return fmt.Errorf(msg)
+	}
+	if !v1.IsControlledBy(replicasStatefulset, og) {
+		msg := fmt.Sprintf(MessageResourceExists, replicaStatefulsetName)
+		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
+		return fmt.Errorf(msg)
+	}
+
+	// checked if replicas number are correct
+	if og.Spec.OpenGauss.Master != *masterStatefulset.Spec.Replicas {
+		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, og.Spec.OpenGauss.Master, *masterStatefulset.Spec.Replicas)
+		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewMasterStatefulsets(og), v1.UpdateOptions{})
+	}
+	if og.Spec.OpenGauss.Replicas != *replicasStatefulset.Spec.Replicas {
+		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, og.Spec.OpenGauss.Replicas, *replicasStatefulset.Spec.Replicas)
+		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewReplicaStatefulsets(og), v1.UpdateOptions{})
+	}
+	if err != nil {
+		return err
+	}
+
+	// finally update opengauss resource status
+	err = c.updateOpenGaussStatus(og, masterStatefulset, replicasStatefulset)
+	if err != nil {
+		return err
+	}
+
+	// record normal event
+	c.recorder.Event(og, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
 	return nil
+}
+
+// update opengauss status
+func (c *Controller) updateOpenGaussStatus(og *opengaussv1.OpenGauss, masterStatefulset *appsv1.StatefulSet, replicasStatefulset *appsv1.StatefulSet) error {
+	var err error
+	og.Status.MasterStatefulset = masterStatefulset.Name
+	og.Status.ReplicasStatefulset = replicasStatefulset.Name
+	og.Status.ReadyMaster = masterStatefulset.Status.ReadyReplicas
+	og.Status.ReadyReplicas = replicasStatefulset.Status.ReadyReplicas
+	og, err = c.openGaussClientset.MeloV1().OpenGausses(og.Namespace).Update(context.TODO(), og, v1.UpdateOptions{})
+	return err
 }
 
 // enqueueFoo takes a OpenGauss resource and converts it into a namespace/name
