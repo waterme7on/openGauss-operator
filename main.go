@@ -17,6 +17,7 @@ import (
 	"flag"
 	"time"
 
+	"k8s.io/client-go/dynamic"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -57,10 +58,15 @@ func main() {
 		klog.Fatalf("Error building example clientset: %s", err.Error())
 	}
 
+	dynamicClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("Error building example clientset: %s", err.Error())
+	}
+
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
 	exampleInformerFactory := informers.NewSharedInformerFactory(openGaussClient, time.Second*30)
 
-	controller := NewController(kubeClient, openGaussClient,
+	controller := NewController(kubeClient, openGaussClient, dynamicClient,
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().Services(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),

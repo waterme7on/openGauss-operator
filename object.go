@@ -45,15 +45,18 @@ func NewReplicaStatefulsets(og *v1.OpenGauss) (sts *appsv1.StatefulSet) {
 // NewStatefulsets returns a statefulset object according to id
 func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res = statefulsetTemplate()
+	res.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
+		*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGauss")),
+	}
 	var formatter util.FormatterInterface
 	switch id {
 	case Master:
 		formatter = util.Master(og.Name)
-		res.Spec.Replicas = int32Ptr(og.Spec.OpenGauss.Master)
+		res.Spec.Replicas = util.Int32Ptr(int32(og.Spec.OpenGauss.Master))
 		break
 	case Replicas:
 		formatter = util.Replica(og.Name)
-		res.Spec.Replicas = int32Ptr(og.Spec.OpenGauss.Replicas)
+		res.Spec.Replicas = util.Int32Ptr(int32(og.Spec.OpenGauss.Replicas))
 		break
 	default:
 		return
@@ -74,16 +77,26 @@ type configmap struct {
 	Metadata   map[string]string `json:"metadata"`
 }
 
+func NewMasterConfigMap(og *v1.OpenGauss) (*unstructured.Unstructured, schema.GroupVersionResource) {
+	return NewConfigMap(Master, og)
+}
+
+func NewReplicaConfigMap(og *v1.OpenGauss) (*unstructured.Unstructured, schema.GroupVersionResource) {
+	return NewConfigMap(Replicas, og)
+}
+
 // NewConfigMap: return New Configmap as unstructured.Unstructured and configMap Schema
 // modify replConnInfo of configmap data["postgresql.conf"] according to the id of og
 func NewConfigMap(id Identity, og *v1.OpenGauss) (*unstructured.Unstructured, schema.GroupVersionResource) {
 	unstructuredMap := loadConfigMapTemplate()
 	var replConnInfo string
+	var formatter util.FormatterInterface
 	if id == Master {
-		replConnInfo = "\nreplconninfo1 = 'localhost=" + og.Name + "-masters-0" + " remotehost=" + og.Name + "-replicas-0" + " localport=5434 localservice=5432 remoteport=5434 remoteservice=5432'\n"
+		formatter = util.Master(og.Name)
 	} else {
-		replConnInfo = "\nreplconninfo1 = 'localhost=$POD_IP remotehost=" + og.Name + "-masters-0" + " localport=5434 localservice=5432 remoteport=5434 remoteservice=5432'\n"
+		formatter = util.Replica(og.Name)
 	}
+	replConnInfo = "\n" + formatter.ReplConnInfo() + "\n"
 	configMap := &unstructured.Unstructured{Object: unstructuredMap}
 
 	// transform configMap from unstructured to []bytes
@@ -97,6 +110,7 @@ func NewConfigMap(id Identity, og *v1.OpenGauss) (*unstructured.Unstructured, sc
 	configMap.UnmarshalJSON(s)
 
 	configMapRes := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+	configMap.SetName(formatter.ConfigMapName())
 	return configMap, configMapRes
 }
 
@@ -145,7 +159,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 			Name: "opengauss-statefulset",
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: int32Ptr(1),
+			Replicas: util.Int32Ptr(1),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "opengauss",
@@ -160,7 +174,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 				},
 				Spec: corev1.PodSpec{
 
-					TerminationGracePeriodSeconds: int64Ptr(10),
+					TerminationGracePeriodSeconds: util.Int64Ptr(10),
 					Containers: []corev1.Container{
 						{
 							Name:  "opengauss",
@@ -174,7 +188,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 								"hba_file=/etc/opengauss/pg_hba.conf",
 							},
 							SecurityContext: &corev1.SecurityContext{
-								Privileged: boolPtr(true),
+								Privileged: util.BoolPtr(true),
 							},
 							Ports: []corev1.ContainerPort{
 								{
@@ -268,7 +282,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 								"storage": resource.MustParse("500Mi"),
 							},
 						},
-						StorageClassName: strPtr("csi-lvm"),
+						StorageClassName: util.StrPtr("csi-lvm"),
 					},
 				},
 			},
@@ -281,7 +295,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 func loadConfigMapTemplate() map[string]interface{} {
 
 	// configMap := corev1.ConfigMap{}
-	fileBytes, err := ioutil.ReadFile("/configs/config.yaml")
+	fileBytes, err := ioutil.ReadFile("configs/config.yaml")
 	if err != nil {
 		fmt.Println("[error]", err)
 	}
@@ -296,11 +310,3 @@ func loadConfigMapTemplate() map[string]interface{} {
 	// log.Println("[log] map: ", unstructuredMap["data"])
 	return unstructuredMap
 }
-
-func int64Ptr(i int64) *int64 { return &i }
-
-func int32Ptr(i int32) *int32 { return &i }
-
-func strPtr(s string) *string { return &s }
-
-func boolPtr(s bool) *bool { return &s }

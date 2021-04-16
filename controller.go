@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"strings"
+	"strconv"
 	"time"
 
 	opengaussv1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
@@ -17,6 +17,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -54,6 +55,7 @@ type Controller struct {
 	kubeClientset kubernetes.Interface
 	// openGaussClientset is a clientset generated for OpenGauss Objects
 	openGaussClientset clientset.Interface
+	dynamicClient      dynamic.Interface
 
 	// openGauss controller manage service, configmap and statefulset of OpenGauss object
 	// thus needing listers of according resources
@@ -81,6 +83,7 @@ type Controller struct {
 func NewController(
 	kubeclientset kubernetes.Interface,
 	openGaussClientset clientset.Interface,
+	dynamicClient dynamic.Interface,
 	statefulsetInformer appsinformers.StatefulSetInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	configmapInformer coreinformers.ConfigMapInformer,
@@ -101,6 +104,7 @@ func NewController(
 
 	controller := &Controller{
 		kubeClientset:      kubeclientset,
+		dynamicClient:      dynamicClient,
 		openGaussClientset: openGaussClientset,
 		openGaussLister:    openGaussInformer.Lister(),
 		openGaussSynced:    openGaussInformer.Informer().HasSynced,
@@ -203,17 +207,15 @@ func (c *Controller) processNextWorkItem() bool {
 		// run syncHandler, passing the string  "namespace/name" of opengauss to be synced
 		// TODO: syncHandler
 		// here simply print out the object
-		objStr := fmt.Sprintf("%v", obj)
-		splitRes := strings.Split(objStr, "/")
-		ns := splitRes[0]
-		name := splitRes[1]
-		og, _ := c.openGaussClientset.MeloV1().OpenGausses(ns).Get(context.TODO(), name, v1.GetOptions{})
-		klog.Infoln("Object:", og)
-		klog.Infoln("Status: Ready or not - ", og.IsReady())
+		if err := c.syncHandler(key); err != nil {
+			// Put the item back on the workqueue to handle any transient errors.
+			c.workqueue.AddRateLimited(key)
+			return fmt.Errorf("error syncing '%s': %s, requeuing", key, err.Error())
+		}
 
 		// if no error occurs, we Forget the items as it has been processed successfully
 		c.workqueue.Forget(obj)
-		klog.Infoln("Successfully synced '%s'", key)
+		klog.Infoln("Successfully synced ", key)
 		return nil
 	}(obj)
 
@@ -236,6 +238,8 @@ func (c *Controller) syncHandler(key string) error {
 
 	// Get the openGauss resource with the namespace and name
 	og, err := c.openGaussLister.OpenGausses(namespace).Get(name)
+	klog.Info("Syncing status of OpenGauss ", og.Name, og.Status)
+
 	if err != nil {
 		// The openGauss object may not exist.
 		if errors.IsNotFound(err) {
@@ -245,32 +249,73 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
+	// check if status exist
+	masterStatefulSetName := ""
+	if og.Status != nil {
+		masterStatefulSetName = og.Status.MasterStatefulset
+	}
+
 	// check the master state
-	masterStatefulSetName := og.Status.MasterStatefulset
 	var masterStatefulset *appsv1.StatefulSet
-	if masterStatefulSetName == "" {
-		// haven't deployed master
-		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Create(context.TODO(), NewMasterStatefulsets(og), v1.CreateOptions{})
-	} else {
-		// already deployed replicas
+	if masterStatefulSetName != "" {
 		masterStatefulset, err = c.statefulsetLister.StatefulSets(og.Namespace).Get(masterStatefulSetName)
 	}
+	if masterStatefulSetName == "" || masterStatefulset == nil || err != nil {
+		// haven't deployed master
+		// firstly create configmap
+		masterConfigMap, masterConfigMapRes := NewMasterConfigMap(og)
+		// check if master configmap exists
+		_, err = c.kubeClientset.CoreV1().ConfigMaps(og.Namespace).Get(context.TODO(), masterConfigMap.GetName(), v1.GetOptions{})
+		if err != nil {
+			_, err = c.dynamicClient.Resource(masterConfigMapRes).Namespace(og.Namespace).Create(context.TODO(), masterConfigMap, v1.CreateOptions{})
+		}
+		masterStatefulset = NewMasterStatefulsets(og)
+		// then create statefulset
+		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Create(context.TODO(), masterStatefulset, v1.CreateOptions{})
+		// og.Status = &opengaussv1.OpenGaussStatus{
+		// 	MasterStatefulset: masterStatefulSetName,
+		// }
+		// og, err = c.openGaussClientset.MeloV1().OpenGausses(og.Namespace).Update(context.TODO(), og, v1.UpdateOptions{})
+	}
+
 	// If an error occurs during Get/Create, we'll requeue the item so we can
 	// attempt processing again later. This could have been caused by a
 	// temporary network failure, or any other transient reason.
 	if err != nil {
 		return err
 	}
+
+	// // check master service
+	// masterServiceName := masterStatefulset.Spec.Template.Spec.Volumes[0].ConfigMap.Name
+	// var masterService *corev1.Service
+	// masterService, err = c.serviceLister.Services(og.Namespace).Get(masterServiceName)
+	// if errors.IsNotFound(err) {
+
+	// }
 
 	// check the replica state
-	replicaStatefulsetName := og.Status.ReplicasStatefulset
+	replicaStatefulsetName := ""
+	if og.Status != nil {
+		replicaStatefulsetName = og.Status.MasterStatefulset
+	}
 	var replicasStatefulset *appsv1.StatefulSet
-	if replicaStatefulsetName == "" {
-		// haven't deployed replicas
-		replicasStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Create(context.TODO(), NewReplicaStatefulsets(og), v1.CreateOptions{})
-	} else {
-		// already deployed replicas
+	if replicaStatefulsetName != "" {
 		replicasStatefulset, err = c.statefulsetLister.StatefulSets(og.Namespace).Get(replicaStatefulsetName)
+	}
+	if replicaStatefulsetName == "" || replicasStatefulset == nil || err != nil {
+		// haven't deployed replicas
+		// firstly create configmap
+		replicaConfigMap, relicaConfigMapRes := NewReplicaConfigMap(og)
+		// check if master configmap exists
+		_, err = c.kubeClientset.CoreV1().ConfigMaps(og.Namespace).Get(context.TODO(), replicaConfigMap.GetName(), v1.GetOptions{})
+		if err != nil {
+			_, err = c.dynamicClient.Resource(relicaConfigMapRes).Namespace(og.Namespace).Create(context.TODO(), replicaConfigMap, v1.CreateOptions{})
+		}
+		replicasStatefulset = NewReplicaStatefulsets(og)
+		// then create statefulset
+		replicasStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Create(context.TODO(), replicasStatefulset, v1.CreateOptions{})
+		// og.Status.ReplicasStatefulset = replicaStatefulsetName
+		// og, err = c.openGaussClientset.MeloV1().OpenGausses(og.Namespace).Update(context.TODO(), og, v1.UpdateOptions{})
 	}
 	// If an error occurs during Get/Create, we'll requeue the item so we can
 	// attempt processing again later. This could have been caused by a
@@ -279,24 +324,24 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
-	// checked if statefulsets are controlled by this og resource
-	if !v1.IsControlledBy(masterStatefulset, og) {
-		msg := fmt.Sprintf(MessageResourceExists, masterStatefulSetName)
-		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
-		return fmt.Errorf(msg)
-	}
-	if !v1.IsControlledBy(replicasStatefulset, og) {
-		msg := fmt.Sprintf(MessageResourceExists, replicaStatefulsetName)
-		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
-		return fmt.Errorf(msg)
-	}
+	// // checked if statefulsets are controlled by this og resource
+	// if !v1.IsControlledBy(masterStatefulset, og) {
+	// 	msg := fmt.Sprintf(MessageResourceExists, masterStatefulSetName)
+	// 	c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
+	// 	return fmt.Errorf(msg)
+	// }
+	// if !v1.IsControlledBy(replicasStatefulset, og) {
+	// 	msg := fmt.Sprintf(MessageResourceExists, replicaStatefulsetName)
+	// 	c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
+	// 	return fmt.Errorf(msg)
+	// }
 
 	// checked if replicas number are correct
-	if og.Spec.OpenGauss.Master != *masterStatefulset.Spec.Replicas {
+	if og.Spec.OpenGauss.Master != int(*masterStatefulset.Spec.Replicas) {
 		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, og.Spec.OpenGauss.Master, *masterStatefulset.Spec.Replicas)
 		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewMasterStatefulsets(og), v1.UpdateOptions{})
 	}
-	if og.Spec.OpenGauss.Replicas != *replicasStatefulset.Spec.Replicas {
+	if og.Spec.OpenGauss.Replicas != int(*replicasStatefulset.Spec.Replicas) {
 		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, og.Spec.OpenGauss.Replicas, *replicasStatefulset.Spec.Replicas)
 		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewReplicaStatefulsets(og), v1.UpdateOptions{})
 	}
@@ -318,11 +363,19 @@ func (c *Controller) syncHandler(key string) error {
 // update opengauss status
 func (c *Controller) updateOpenGaussStatus(og *opengaussv1.OpenGauss, masterStatefulset *appsv1.StatefulSet, replicasStatefulset *appsv1.StatefulSet) error {
 	var err error
-	og.Status.MasterStatefulset = masterStatefulset.Name
-	og.Status.ReplicasStatefulset = replicasStatefulset.Name
-	og.Status.ReadyMaster = masterStatefulset.Status.ReadyReplicas
-	og.Status.ReadyReplicas = replicasStatefulset.Status.ReadyReplicas
-	og, err = c.openGaussClientset.MeloV1().OpenGausses(og.Namespace).Update(context.TODO(), og, v1.UpdateOptions{})
+	ogCopy := og.DeepCopy()
+	if ogCopy.Status == nil {
+		ogCopy.Status = &opengaussv1.OpenGaussStatus{}
+	}
+	ogCopy.Status.MasterStatefulset = masterStatefulset.Name
+	ogCopy.Status.ReplicasStatefulset = replicasStatefulset.Name
+	ogCopy.Status.ReadyMaster = (strconv.Itoa(int(masterStatefulset.Status.ReadyReplicas)))
+	ogCopy.Status.ReadyReplicas = (strconv.Itoa(int(replicasStatefulset.Status.ReadyReplicas)))
+	ogCopy, err = c.openGaussClientset.MeloV1().OpenGausses(ogCopy.Namespace).UpdateStatus(context.TODO(), ogCopy, v1.UpdateOptions{})
+	klog.Infoln(ogCopy.Status)
+	if err != nil {
+		klog.Infoln("Failed to update opengauss status:", ogCopy.Name, " error:", err)
+	}
 	return err
 }
 

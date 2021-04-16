@@ -11,8 +11,8 @@ type OpenGauss struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// +optional
-	Status OpenGaussStatus `json:"status,omitempty"`
-	Spec   OpenGaussSpec   `json:"spec,omitempty"`
+	Status *OpenGaussStatus `json:"status,omitempty"`
+	Spec   *OpenGaussSpec   `json:"spec,omitempty"`
 }
 
 type OpenGaussSpec struct {
@@ -23,15 +23,15 @@ type OpenGaussSpec struct {
 
 // Define OpenGauss's needs for master and replicas
 type OpenGaussClusterConfiguration struct {
-	Master   int32 `json:"master"`   // Number of Master
-	Replicas int32 `json:"replicas"` // Number of Replicas
+	Master   int `json:"master"`   // Number of Master
+	Replicas int `json:"replicas"` // Number of Replicas
 }
 
 // OpenGauss Cluster's status
 type OpenGaussStatus struct {
 	OpenGaussStatus     string `json:"opengaussStatus"`               // OpenGauss if ready or not
-	ReadyMaster         int32  `json:"readyMaster,omitempty"`         // Ready Master number
-	ReadyReplicas       int32  `json:"readyReplicas,omitempty"`       // Ready Replicas number
+	ReadyMaster         string `json:"readyMaster,omitempty"`         // Ready Master number
+	ReadyReplicas       string `json:"readyReplicas,omitempty"`       // Ready Replicas number
 	MasterStatefulset   string `json:"masterStatefulset,omitempty"`   // name of master statefulset
 	ReplicasStatefulset string `json:"replicasStatefulset,omitempty"` // name of replicas statefulset
 }
