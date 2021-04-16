@@ -30,11 +30,14 @@ func (formatter *MasterFormatter) ServiceName() string {
 }
 
 func (formatter *MasterFormatter) ReplConnInfo() string {
-	return formatter.configName + "-masters"
+	replica := Replica(formatter.configName)
+	replInfo := "replconninfo1 = 'localhost=" + formatter.StatefulSetName() + "-0" + " remotehost=" + replica.StatefulSetName() + "-0" + " localport=5434 localservice=5432 remoteport=5434 remoteservice=5432'\n"
+	return replInfo
 }
 
 func (formatter *MasterFormatter) ConfigMapName() string {
 	return formatter.configName + "-master-config"
+
 }
 
 type ReplicaFormatter struct {
@@ -50,7 +53,9 @@ func (formatter *ReplicaFormatter) ServiceName() string {
 }
 
 func (formatter *ReplicaFormatter) ReplConnInfo() string {
-	return formatter.configName + "-replicas"
+	master := Master(formatter.configName)
+	replInfo := "replconninfo1 = 'localhost=$POD_IP" + " remotehost=" + master.StatefulSetName() + "-0" + " localport=5434 localservice=5432 remoteport=5434 remoteservice=5432'\n"
+	return replInfo
 }
 
 func (formatter *ReplicaFormatter) ConfigMapName() string {

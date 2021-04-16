@@ -29,8 +29,16 @@ func (in *OpenGauss) DeepCopyInto(out *OpenGauss) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	out.Status = in.Status
-	in.Spec.DeepCopyInto(&out.Spec)
+	if in.Status != nil {
+		in, out := &in.Status, &out.Status
+		*out = new(OpenGaussStatus)
+		**out = **in
+	}
+	if in.Spec != nil {
+		in, out := &in.Spec, &out.Spec
+		*out = new(OpenGaussSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

@@ -18,6 +18,8 @@ spec:
   - name: v1
     served: true
     storage: true
+    subresources:
+      status: {}
     additionalPrinterColumns:
     - jsonPath:  .status.conditions[?(@.type=="Ready")].status
       name: Ready
@@ -26,18 +28,18 @@ spec:
       description: The image for opengauss cluster.
       name: Image
       type: string
-    - jsonPath: .status.opengauss.statefulSet.readyMaster
+    - jsonPath: .status.readyMaster
       description: The ready master number of opengauss cluster
       name: Master-Ready
-      type: integer
+      type: string
     - jsonPath: .spec.opengauss.master
       description: The desired master number of opengauss cluster
       name: Master-Desire
       type: integer
-    - jsonPath: .status.opengauss.statefulSet.readyReplicas
+    - jsonPath: .status.readyReplicas
       description: The ready replicas number of opengauss cluster
       name: Replicas-Ready
-      type: integer
+      type: string
     - jsonPath: .spec.opengauss.replicas
       description: The desired replicas number of opengauss cluster
       name: Replicas-Desire
@@ -86,10 +88,6 @@ spec:
                     format: int32
                     type: integer
                     minimum: 0
-              status:
-                type: object
-                additionalProperties:
-                  type: string
               resources:
                 type: object
                 required:
@@ -139,3 +137,7 @@ spec:
                       memory:
                         type: string
                         pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+          status:
+            type: object
+            additionalProperties:
+              type: string
