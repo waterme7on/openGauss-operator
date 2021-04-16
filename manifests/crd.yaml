@@ -21,9 +21,9 @@ spec:
     subresources:
       status: {}
     additionalPrinterColumns:
-    - jsonPath:  .status.conditions[?(@.type=="Ready")].status
-      name: Ready
-      type: string
+    # - jsonPath:  .status.conditions[?(@.type=="Ready")].status
+    #   name: Ready
+    #   type: string
     - jsonPath: .spec.image
       description: The image for opengauss cluster.
       name: Image
