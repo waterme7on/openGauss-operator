@@ -137,6 +137,7 @@ func NewController(
 			}
 			controller.handleObjects(new)
 		},
+		DeleteFunc: controller.handleObjects,
 	})
 
 	return controller
