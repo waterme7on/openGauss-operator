@@ -1,0 +1,472 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opengauss-config
+  namespace: default
+data:
+  pg_hba.conf: |
+    # PostgreSQL Client Authentication Configuration File
+    # ===================================================
+    #
+    # Refer to the "Client Authentication" section in the PostgreSQL
+    # documentation for a complete description of this file.  A short
+    # synopsis follows.
+    #
+    # This file controls: which hosts are allowed to connect, how clients
+    # are authenticated, which PostgreSQL user names they can use, which
+    # databases they can access.  Records take one of these forms:
+    #
+    # local      DATABASE  USER  METHOD  [OPTIONS]
+    # host       DATABASE  USER  ADDRESS  METHOD  [OPTIONS]
+    # hostssl    DATABASE  USER  ADDRESS  METHOD  [OPTIONS]
+    # hostnossl  DATABASE  USER  ADDRESS  METHOD  [OPTIONS]
+    #
+    # (The uppercase items must be replaced by actual values.)
+    #
+    # The first field is the connection type: "local" is a Unix-domain
+    # socket, "host" is either a plain or SSL-encrypted TCP/IP socket,
+    # "hostssl" is an SSL-encrypted TCP/IP socket, and "hostnossl" is a
+    # plain TCP/IP socket.
+    #
+    # DATABASE can be "all", "sameuser", "samerole", "replication", a
+    # database name, or a comma-separated list thereof. The "all"
+    # keyword does not match "replication". Access to replication
+    # must be enabled in a separate record (see example below).
+    #
+    # USER can be "all", a user name, a group name prefixed with "+", or a
+    # comma-separated list thereof.  In both the DATABASE and USER fields
+    # you can also write a file name prefixed with "@" to include names
+    # from a separate file.
+    #
+    # ADDRESS specifies the set of hosts the record matches.  It can be a
+    # host name, or it is made up of an IP address and a CIDR mask that is
+    # an integer (between 0 and 32 (IPv4) or 128 (IPv6) inclusive) that
+    # specifies the number of significant bits in the mask.  A host name
+    # that starts with a dot (.) matches a suffix of the actual host name.
+    # Alternatively, you can write an IP address and netmask in separate
+    # columns to specify the set of hosts.  Instead of a CIDR-address, you
+    # can write "samehost" to match any of the server's own IP addresses,
+    # or "samenet" to match any address in any subnet that the server is
+    # directly connected to.
+    #
+    # METHOD can be "trust", "reject", "md5", "sha256" or "cert".
+    # "sha256" is preferred since
+
+    #
+    # OPTIONS are a set of options for the authentication in the format
+    # NAME=VALUE.  The available options depend on the different
+    # authentication methods -- refer to the "Client Authentication"
+    # section in the documentation for a list of which options are
+    # available for which authentication methods.
+    #
+    # Database and user names containing spaces, commas, quotes and other
+    # special characters must be quoted.  Quoting one of the keywords
+    # "all", "sameuser", "samerole" or "replication" makes the name lose
+    # its special character, and just match a database or username with
+    # that name.
+
+    #
+    # This file is read on server startup and when the postmaster receives
+    # a SIGHUP signal.  If you edit the file on a running system, you have
+    # to SIGHUP the postmaster for the changes to take effect.  You can
+    # use "pg_ctl reload" to do that.
+
+    # Put your actual configuration here
+    # ----------------------------------
+    #
+    # If you want to allow non-local connections, you need to add more
+    # "host" records.  In that case you will also need to make PostgreSQL
+    # listen on a non-local interface via the listen_addresses
+    # configuration parameter, or via the -i or -h command line switches.
+    #
+    # NOTICE:
+    # ----------------------------------
+    #
+    # When you configure this file, please configure it from top to bottom,
+    # higher priority needs to be configured in front.
+
+    # CAUTION: Configuring the system for local "trust" authentication
+    # allows any local user to connect as any PostgreSQL user, including
+    # the database sysadmin.  If you do not trust all your local users,
+    # use another authentication method.
+
+
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+    # "local" is for Unix domain socket connections only
+    local   all             all                                     trust
+    # IPv4 local connections:
+    host    all             all             127.0.0.1/32            trust
+    # IPv6 local connections:
+    host    all             all             ::1/128                 trust
+    # Allow replication connections from localhost, by a user with the
+    # replication privilege.
+    #local   replication     omm                                trust
+    #host    replication     omm        127.0.0.1/32            trust
+    #host    replication     omm        ::1/128                 trust
+
+    host all all 0.0.0.0/0 md5
+    host replication repuser 0.0.0.0/0 trust
+  postgresql.conf: "# -----------------------------\n# PostgreSQL configuration file\n#
+    -----------------------------\n#\n# This file consists of lines of the form:\n#\n#
+    \  name = value\n#\n# (The \"=\" is optional.)  Whitespace may be used.  Comments
+    are introduced with\n# \"#\" anywhere on a line.  The complete list of parameter
+    names and allowed\n# values can be found in the PostgreSQL documentation.\n#\n#
+    The commented-out settings shown in this file represent the default values.\n#
+    Re-commenting a setting is NOT sufficient to revert it to the default value;\n#
+    you need to reload the server.\n#\n# This file is read on server startup and when
+    the server receives a SIGHUP\n# signal.  If you edit the file on a running system,
+    you have to SIGHUP the\n# server for the changes to take effect, or use \"pg_ctl
+    reload\".  Some\n# parameters, which are marked below, require a server shutdown
+    and restart to\n# take effect.\n#\n# Any parameter can also be given as a command-line
+    option to the server, e.g.,\n# \"postgres -c log_connections=on\".  Some parameters
+    can be changed at run time\n# with the \"SET\" SQL command.\n#\n# Memory units:
+    \ kB = kilobytes        Time units:  ms  = milliseconds\n#                MB =
+    megabytes                     s   = seconds\n#                GB = gigabytes                     min
+    = minutes\n#                                                   h   = hours\n#
+    \                                                  d   = days\n\n\n#------------------------------------------------------------------------------\n#
+    FILE LOCATIONS\n#------------------------------------------------------------------------------\n\n#
+    The default values of these variables are driven from the -D command-line\n# option
+    or PGDATA environment variable, represented here as ConfigDir.\n\n#data_directory
+    = 'ConfigDir'\t\t# use data in another directory\n\t\t\t\t\t# (change requires
+    restart)\n#hba_file = 'ConfigDir/pg_hba.conf'\t# host-based authentication file\n\t\t\t\t\t#
+    (change requires restart)\n#ident_file = 'ConfigDir/pg_ident.conf'\t# ident configuration
+    file\n\t\t\t\t\t# (change requires restart)\n\n# If external_pid_file is not explicitly
+    set, no extra PID file is written.\n#external_pid_file = ''\t\t\t# write an extra
+    PID file\n\t\t\t\t\t# (change requires restart)\n\n\n#------------------------------------------------------------------------------\n#
+    CONNECTIONS AND AUTHENTICATION\n#------------------------------------------------------------------------------\n\n#
+    - Connection Settings -\n\n#listen_addresses = 'localhost'\t\t# what IP address(es)
+    to listen on;\n\t\t\t\t\t# comma-separated list of addresses;\n\t\t\t\t\t# defaults
+    to 'localhost'\n\t\t\t\t\t# (change requires restart)\n#local_bind_address = '0.0.0.0'\n#port
+    = 5432\t\t\t\t# (change requires restart)\nmax_connections = 200\t\t\t# (change
+    requires restart)\nmax_inner_tool_connections = 10\t# (change requires restart)\n#
+    Note:  Increasing max_connections costs ~400 bytes of shared memory per\n# connection
+    slot, plus lock space (see max_locks_per_transaction).\n#sysadmin_reserved_connections
+    = 3\t# (change requires restart)\n#unix_socket_directory = ''\t\t# (change requires
+    restart)\n#unix_socket_group = ''\t\t\t# (change requires restart)\n#unix_socket_permissions
+    = 0700\t\t# begin with 0 to use octal notation\n\t\t\t\t\t# (change requires restart)\n\n#
+    - Security and Authentication -\n\n#authentication_timeout = 1min\t\t# 1s-600s\nsession_timeout
+    = 10min\t\t\t# allowed duration of any unused session, 0s-86400s(1 day), 0 is
+    disabled \n#ssl = off\t\t\t\t# (change requires restart)\n#ssl_ciphers = 'ALL'\t\t\t#
+    allowed SSL ciphers\n\t\t\t\t\t# (change requires restart)\n#ssl_renegotiation_limit
+    = 0\t\t# amount of data between renegotiations, no longer supported\n#ssl_cert_file
+    = 'server.crt'\t\t# (change requires restart)\n#ssl_key_file = 'server.key'\t\t#
+    (change requires restart)\n#ssl_ca_file = ''\t\t\t# (change requires restart)\n#ssl_crl_file
+    = ''\t\t\t# (change requires restart)\n\n# Kerberos and GSSAPI\n#krb_server_keyfile
+    = ''\n#krb_srvname = 'postgres'\t\t# (Kerberos only)\n#krb_caseins_users = off\n\n#modify_initial_password
+    = false\t#Whether to change the initial password of the initial user\n#password_policy
+    = 1\t\t\t#Whether password complexity checks\n#password_reuse_time = 60\t\t#Whether
+    the new password can be reused in password_reuse_time days\n#password_reuse_max
+    = 0\t\t\t#Whether the new password can be reused\n#password_lock_time = 1\t\t\t#The
+    account will be unlocked automatically after a specified period of time\n#failed_login_attempts
+    = 10\t\t#Enter the wrong password reached failed_login_attempts times, the current
+    account will be locked\n#password_encryption_type = 2\t\t#Password storage type,
+    0 is md5 for PG, 1 is sha256 + md5, 2 is sha256 only\n#password_min_length = 8\t\t#The
+    minimal password length(6-999)\n#password_max_length = 32\t\t#The maximal password
+    length(6-999)\n#password_min_uppercase = 0\t\t#The minimal upper character number
+    in password(0-999)\n#password_min_lowercase = 0\t\t#The minimal lower character
+    number in password(0-999)\n#password_min_digital = 0\t\t#The minimal digital character
+    number in password(0-999)\n#password_min_special = 0\t\t#The minimal special character
+    number in password(0-999)\n#password_effect_time = 90d\t\t#The password effect
+    time(0-999)\n#password_notify_time = 7d\t\t#The password notify time(0-999)\n\n#
+    - TCP Keepalives -\n# see \"man 7 tcp\" for details\n\n#tcp_keepalives_idle =
+    0\t\t# TCP_KEEPIDLE, in seconds;\n\t\t\t\t\t# 0 selects the system default\n#tcp_keepalives_interval
+    = 0\t\t# TCP_KEEPINTVL, in seconds;\n\t\t\t\t\t# 0 selects the system default\n#tcp_keepalives_count
+    = 0\t\t# TCP_KEEPCNT;\n\t\t\t\t\t# 0 selects the system default\n\n#tcp_recv_timeout
+    = 0\t\t\t# SO_RCVTIMEO, specify the receiving timeouts until reporting an error(change
+    requires restart)\n#comm_tcp_mode = true\t\t\t# TCP commucation mode for stream
+    between Datanodes (change requires restart)\n#comm_sctp_port = 1024\t\t\t# Assigned
+    by installation (change requires restart)\n#comm_control_port = 10001\t\t# Assigned
+    by installation (change requires restart)\n#comm_max_receiver = 1\t\t\t# The number
+    of internal receiver (1-50, default 1, should be smaller than comm_max_datanode,
+    change requires restart)\n#comm_quota_size =  8192kB\t\t# The quota size of each
+    stream, 8-2048000 in KByte, 0 for unlimitation, default unit is kB(change requires
+    restart)\n#comm_usable_memory = 4000MB\t\t# The total usable memory for communication
+    layer of each datanode process, 100-INT_MAX/2 in MByte, default unit is kB(change
+    requires restart)\n\n#------------------------------------------------------------------------------\n#
+    RESOURCE USAGE (except WAL)\n#------------------------------------------------------------------------------\n\n#
+    - Memory -\n#memorypool_enable = false\n#memorypool_size = 512MB\n\n#enable_memory_limit
+    = true\n#max_process_memory = 12GB\n#UDFWorkerMemHardLimit = 1GB\n\n#shared_buffers
+    = 32MB\t\t\t# min 128kB\n\t\t\t\t\t# (change requires restart)\nbulk_write_ring_size
+    = 2GB\t\t# for bulkload, max shared_buffers\n#standby_shared_buffers_fraction
+    = 0.3 #control shared buffers use in standby, 0.1-1.0\n#temp_buffers = 8MB\t\t\t#
+    min 800kB\nmax_prepared_transactions = 200\t\t# zero disables the feature\n\t\t\t\t\t#
+    (change requires restart)\n# Note:  Increasing max_prepared_transactions costs
+    ~600 bytes of shared memory\n# per transaction slot, plus lock space (see max_locks_per_transaction).\n#
+    It is not advisable to set max_prepared_transactions nonzero unless you\n# actively
+    intend to use prepared transactions.\n#work_mem = 64MB\t\t\t\t# min 64kB\n#maintenance_work_mem
+    = 16MB\t\t# min 1MB\n#max_stack_depth = 2MB\t\t\t# min 100kB\n\ncstore_buffers
+    = 512MB         #min 16MB\n\n# - Disk -\n\n#temp_file_limit = -1\t\t\t# limits
+    per-session temp file space\n\t\t\t\t\t# in kB, or -1 for no limit\n\n#sql_use_spacelimit
+    = -1                # limits for single SQL used space on single DN\n\t\t\t\t\t#
+    in kB, or -1 for no limit\n\n# - Kernel Resource Usage -\n\n#max_files_per_process
+    = 1000\t\t# min 25\n\t\t\t\t\t# (change requires restart)\n#shared_preload_libraries
+    = ''\t\t# (change requires restart)\n\n# - Cost-Based Vacuum Delay -\n\n#vacuum_cost_delay
+    = 0ms\t\t# 0-100 milliseconds\n#vacuum_cost_page_hit = 1\t\t# 0-10000 credits\n#vacuum_cost_page_miss
+    = 10\t\t# 0-10000 credits\n#vacuum_cost_page_dirty = 20\t\t# 0-10000 credits\n#vacuum_cost_limit
+    = 200\t\t# 1-10000 credits\n\n# - Background Writer -\n\n#bgwriter_delay = 10s\t\t\t#
+    10-10000ms between rounds\n#bgwriter_lru_maxpages = 100\t\t# 0-1000 max buffers
+    written/round\n#bgwriter_lru_multiplier = 2.0\t\t# 0-10.0 multipler on buffers
+    scanned/round\n\n# - Asynchronous Behavior -\n\n#effective_io_concurrency = 1\t\t#
+    1-1000; 0 disables prefetching\n\n\n#------------------------------------------------------------------------------\n#
+    WRITE AHEAD LOG\n#------------------------------------------------------------------------------\n\n#
+    - Settings -\n\nwal_level = hot_standby\t\t\t# minimal, archive, hot_standby or
+    logical\n\t\t\t\t\t# (change requires restart)\n#fsync = on\t\t\t\t# turns forced
+    synchronization on or off\nsynchronous_commit = off\t\t# synchronization level;\n\t\t\t\t\t#
+    off, local, remote_receive, remote_write, or on\n\t\t\t\t\t# It's global control
+    for all transactions\n\t\t\t\t\t# It could not be modified by gs_ctl reload, unless
+    use setsyncmode.\n\n#wal_sync_method = fsync\t\t# the default is the first option\n\t\t\t\t\t#
+    supported by the operating system:\n\t\t\t\t\t#   open_datasync\n\t\t\t\t\t#   fdatasync
+    (default on Linux)\n\t\t\t\t\t#   fsync\n\t\t\t\t\t#   fsync_writethrough\n\t\t\t\t\t#
+    \  open_sync\n#full_page_writes = on\t\t\t# recover from partial page writes\n#wal_buffers
+    = 16MB\t\t\t# min 32kB, -1 sets based on shared_buffers\n\t\t\t\t\t# (change requires
+    restart)\n#wal_writer_delay = 200ms\t\t# 1-10000 milliseconds\n\n#commit_delay
+    = 0\t\t\t# range 0-100000, in microseconds\n#commit_siblings = 5\t\t\t# range
+    1-1000\n\n# - Checkpoints -\n\n#checkpoint_segments = 64\t\t# in logfile segments,
+    min 1, 16MB each\n#checkpoint_timeout = 15min\t\t# range 30s-1h\n#checkpoint_completion_target
+    = 0.5\t# checkpoint target duration, 0.0 - 1.0\n#checkpoint_warning = 5min\t\t#
+    0 disables\n#checkpoint_wait_timeout = 60s  # maximum time wait checkpointer to
+    start\n\nenable_incremental_checkpoint = on\t# enable incremental checkpoint\nincremental_checkpoint_timeout
+    = 60s\t# range 1s-1h\npagewriter_sleep = 100ms\t\t# dirty page writer sleep time,
+    0ms - 1h\n#pagewriter_threshold = 818\t#Lower limit for triggering the pagewriter
+    to flush the dirty page. 1-2147483647,\n\t\t\t\t#Do not set this parameter to
+    a value greater than Nbuffer.\n\n# - Archiving -\n\n#archive_mode = off\t\t# allows
+    archiving to be done\n\t\t\t\t# (change requires restart)\n#archive_command =
+    ''\t\t# command to use to archive a logfile segment\n\t\t\t\t# placeholders: %p
+    = path of file to archive\n\t\t\t\t#               %f = file name only\n\t\t\t\t#
+    e.g. 'test ! -f /mnt/server/archivedir/%f && cp %p /mnt/server/archivedir/%f'\n#archive_timeout
+    = 0\t\t# force a logfile segment switch after this\n\t\t\t\t# number of seconds;
+    0 disables\n\n\n#------------------------------------------------------------------------------\n#
+    REPLICATION\n#------------------------------------------------------------------------------\n\n#
+    - heartbeat -\n#datanode_heartbeat_interval = 1s         # The heartbeat interval
+    of the standby nodes.\n\t\t\t\t # The value is best configured less than half
+    of \n\t\t\t\t # the wal_receiver_timeout and wal_sender_timeout.\n\n# - Sending
+    Server(s) -\n\n# Set these on the master and on any standby that will send replication
+    data.\n\nmax_wal_senders = 4\t\t# max number of walsender processes\n\t\t\t\t#
+    (change requires restart)\nwal_keep_segments = 16\t\t# in logfile segments, 16MB
+    each; 0 disables\n#wal_sender_timeout = 6s\t# in milliseconds; 0 disables\n\n#replconninfo1
+    = ''\t\t# replication connection information used to connect primary on standby,
+    or standby on primary,\n\t\t\t\t\t\t# or connect primary or standby on secondary\n\t\t\t\t\t\t#
+    The heartbeat thread will not start if not set localheartbeatport and remoteheartbeatport.\n\t\t\t\t\t\t#
+    e.g. 'localhost=xx.xx.xxx.2 localport=12211 localheartbeatport=12214 remotehost=xx.xx.xxx.3
+    remoteport=12212 remoteheartbeatport=12215, localhost=xx.xx.xxx.2 localport=12213
+    remotehost=xx.xx.xxx.3 remoteport=12214'\n#replconninfo2 = ''\t\t# replication
+    connection information used to connect secondary on primary or standby,\n\t\t\t\t\t\t#
+    or connect primary or standby on secondary\n\t\t\t\t\t\t# e.g. as replconninfo1
+    example\n#replconninfo3 = ''             # replication connection information
+    used to connect primary on standby, or standby on primary,\n                                                #
+    e.g. as replconninfo1 example\n#replconninfo4 = ''             # replication connection
+    information used to connect primary on standby, or standby on primary,\n                                                #
+    e.g. as replconninfo1 example\n\n# - Master Server -\n\n# These settings are ignored
+    on a standby server.\n\nsynchronous_standby_names = '*'\t# standby servers that
+    provide sync rep\n\t\t\t\t# comma-separated list of application_name\n\t\t\t\t#
+    from standby(s); '*' = all\n#most_available_sync = off\t# Whether master is allowed
+    to continue\n\t\t\t\t# as standbalone after sync standby failure\n\t\t\t\t# It's
+    global control for all transactions\n#vacuum_defer_cleanup_age = 0\t# number of
+    xacts by which cleanup is delayed\n#data_replicate_buffer_size = 16MB\t# data
+    replication buffer size\nwalsender_max_send_size = 8MB  # Size of walsender max
+    send size\n#enable_data_replicate = on\n\n# - Standby Servers -\n\n# These settings
+    are ignored on a master server.\n\nhot_standby = on\t\t\t# \"on\" allows queries
+    during recovery\n\t\t\t\t\t# (change requires restart)\n#max_standby_archive_delay
+    = 30s\t# max delay before canceling queries\n\t\t\t\t\t# when reading WAL from
+    archive;\n\t\t\t\t\t# -1 allows indefinite delay\n#max_standby_streaming_delay
+    = 30s\t# max delay before canceling queries\n\t\t\t\t\t# when reading streaming
+    WAL;\n\t\t\t\t\t# -1 allows indefinite delay\n#wal_receiver_status_interval =
+    5s\t# send replies at least this often\n\t\t\t\t\t# 0 disables\n#hot_standby_feedback
+    = off\t\t# send info from standby to prevent\n\t\t\t\t\t# query conflicts\n#wal_receiver_timeout
+    = 6s\t\t# time that receiver waits for\n\t\t\t\t\t# communication from master\n\t\t\t\t\t#
+    in milliseconds; 0 disables\n#wal_receiver_connect_timeout = 1s\t# timeout that
+    receiver connect master\n\t\t\t\t\t\t\t# in seconds; 0 disables\n#wal_receiver_connect_retries
+    = 1\t# max retries that receiver connect master\n#wal_receiver_buffer_size = 64MB\t#
+    wal receiver buffer size\n#enable_xlog_prune = on # xlog keep for all standbys
+    even through they are not connecting and donnot created replslot.\n\n#------------------------------------------------------------------------------\n#
+    QUERY TUNING\n#------------------------------------------------------------------------------\n\n#
+    - Planner Method Configuration -\n\n#enable_bitmapscan = on\n#enable_hashagg =
+    on\n#enable_hashjoin = on\n#enable_indexscan = on\n#enable_indexonlyscan = on\n#enable_material
+    = on\n#enable_mergejoin = on\n#enable_nestloop = on\n#enable_seqscan = on\n#enable_sort
+    = on\n#enable_tidscan = on\nenable_kill_query = off\t\t\t# optional: [on, off],
+    default: off\n#enforce_a_behavior = on\n# - Planner Cost Constants -\n\n#seq_page_cost
+    = 1.0\t\t\t# measured on an arbitrary scale\n#random_page_cost = 4.0\t\t\t# same
+    scale as above\n#cpu_tuple_cost = 0.01\t\t\t# same scale as above\n#cpu_index_tuple_cost
+    = 0.005\t\t# same scale as above\n#cpu_operator_cost = 0.0025\t\t# same scale
+    as above\n#effective_cache_size = 128MB\n\n# - Genetic Query Optimizer -\n\n#geqo
+    = on\n#geqo_threshold = 12\n#geqo_effort = 5\t\t\t# range 1-10\n#geqo_pool_size
+    = 0\t\t\t# selects default based on effort\n#geqo_generations = 0\t\t\t# selects
+    default based on effort\n#geqo_selection_bias = 2.0\t\t# range 1.5-2.0\n#geqo_seed
+    = 0.0\t\t\t# range 0.0-1.0\n\n# - Other Planner Options -\n\n#default_statistics_target
+    = 100\t# range 1-10000\n#constraint_exclusion = partition\t# on, off, or partition\n#cursor_tuple_fraction
+    = 0.1\t\t# range 0.0-1.0\n#from_collapse_limit = 8\n#join_collapse_limit = 8\t\t#
+    1 disables collapsing of explicit\n\t\t\t\t\t# JOIN clauses\n#plan_mode_seed =
+    0         # range -1-0x7fffffff\n#check_implicit_conversions = off\n\n#------------------------------------------------------------------------------\n#
+    ERROR REPORTING AND LOGGING\n#------------------------------------------------------------------------------\n\n#
+    - Where to Log -\n\n#log_destination = 'stderr'\t\t# Valid values are combinations
+    of\n\t\t\t\t\t# stderr, csvlog, syslog, and eventlog,\n\t\t\t\t\t# depending on
+    platform.  csvlog\n\t\t\t\t\t# requires logging_collector to be on.\n\n# This
+    is used when logging to stderr:\nlogging_collector = on   \t\t# Enable capturing
+    of stderr and csvlog\n\t\t\t\t\t# into log files. Required to be on for\n\t\t\t\t\t#
+    csvlogs.\n\t\t\t\t\t# (change requires restart)\n\n# These are only used if logging_collector
+    is on:\n#log_directory = 'pg_log'\t\t# directory where log files are written,\n\t\t\t\t\t#
+    can be absolute or relative to PGDATA\nlog_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'\t#
+    log file name pattern,\n\t\t\t\t\t# can include strftime() escapes\nlog_file_mode
+    = 0600\t\t\t# creation mode for log files,\n\t\t\t\t\t# begin with 0 to use octal
+    notation\n#log_truncate_on_rotation = off\t\t# If on, an existing log file with
+    the\n\t\t\t\t\t# same name as the new log file will be\n\t\t\t\t\t# truncated
+    rather than appended to.\n\t\t\t\t\t# But such truncation only occurs on\n\t\t\t\t\t#
+    time-driven rotation, not on restarts\n\t\t\t\t\t# or size-driven rotation.  Default
+    is\n\t\t\t\t\t# off, meaning append to existing files\n\t\t\t\t\t# in all cases.\n#log_rotation_age
+    = 1d\t\t\t# Automatic rotation of logfiles will\n\t\t\t\t\t# happen after that
+    time.  0 disables.\nlog_rotation_size = 20MB\t\t# Automatic rotation of logfiles
+    will\n\t\t\t\t\t# happen after that much log output.\n\t\t\t\t\t# 0 disables.\n\n#
+    These are relevant when logging to syslog:\n#syslog_facility = 'LOCAL0'\n#syslog_ident
+    = 'postgres'\n\n# This is only relevant when logging to eventlog (win32):\n#event_source
+    = 'PostgreSQL'\n\n# - When to Log -\n\n#log_min_messages = warning\t\t# values
+    in order of decreasing detail:\n\t\t\t\t\t#   debug5\n\t\t\t\t\t#   debug4\n\t\t\t\t\t#
+    \  debug3\n\t\t\t\t\t#   debug2\n\t\t\t\t\t#   debug1\n\t\t\t\t\t#   info\n\t\t\t\t\t#
+    \  notice\n\t\t\t\t\t#   warning\n\t\t\t\t\t#   error\n\t\t\t\t\t#   log\n\t\t\t\t\t#
+    \  fatal\n\t\t\t\t\t#   panic\n\n#log_min_error_statement = error\t# values in
+    order of decreasing detail:\n\t\t\t\t \t#   debug5\n\t\t\t\t\t#   debug4\n\t\t\t\t\t#
+    \  debug3\n\t\t\t\t\t#   debug2\n\t\t\t\t\t#   debug1\n\t\t\t\t \t#   info\n\t\t\t\t\t#
+    \  notice\n\t\t\t\t\t#   warning\n\t\t\t\t\t#   error\n\t\t\t\t\t#   log\n\t\t\t\t\t#
+    \  fatal\n\t\t\t\t\t#   panic (effectively off)\n\nlog_min_duration_statement
+    = 1800000\t# -1 is disabled, 0 logs all statements\n\t\t\t\t\t# and their durations,
+    > 0 logs only\n\t\t\t\t\t# statements running at least this number\n\t\t\t\t\t#
+    of milliseconds\n\n\n# - What to Log -\n\n#debug_print_parse = off\n#debug_print_rewritten
+    = off\n#debug_print_plan = off\n#debug_pretty_print = on\n#log_checkpoints = off\n#log_pagewriter
+    = off\nlog_connections = off\t\t\t# log connection requirement from client\nlog_disconnections
+    = off\t\t# log disconnection from client\nlog_duration = on\t\t\t# log the execution
+    time of each query\n\t\t\t\t\t# when log_duration is on and log_min_duration_statement\n\t\t\t\t\t#
+    is larger than zero, log the ones whose execution time\n\t\t\t\t\t# is larger
+    than this threshold\n#log_error_verbosity = default\t\t# terse, default, or verbose
+    messages\nlog_hostname = on\t\t\t# log hostname\nlog_line_prefix = '%m %u %d %h
+    %p %S '\t# special values:\n\t\t\t\t\t#   %a = application name\n\t\t\t\t\t#   %u
+    = user name\n\t\t\t\t\t#   %d = database name\n\t\t\t\t\t#   %r = remote host
+    and port\n\t\t\t\t\t#   %h = remote host\n\t\t\t\t\t#   %p = process ID\n\t\t\t\t\t#
+    \  %t = timestamp without milliseconds\n\t\t\t\t\t#   %m = timestamp with milliseconds\n\t\t\t\t\t#
+    \  %n = DataNode name\n\t\t\t\t\t#   %i = command tag\n\t\t\t\t\t#   %e = SQL
+    state\n\t\t\t\t\t#   %c = logic thread ID\n\t\t\t\t\t#   %l = session line number\n\t\t\t\t\t#
+    \  %s = session start timestamp\n\t\t\t\t\t#   %v = virtual transaction ID\n\t\t\t\t\t#
+    \  %x = transaction ID (0 if none)\n\t\t\t\t\t#   %q = stop here in non-session\n\t\t\t\t\t#
+    \       processes\n\t\t\t\t\t#   %S = session ID\n\t\t\t\t\t#   %% = '%'\n\t\t\t\t\t#
+    e.g. '<%u%%%d> '\n#log_lock_waits = off\t\t\t# log lock waits >= deadlock_timeout\n#log_statement
+    = 'none'\t\t\t# none, ddl, mod, all\n#log_temp_files = -1\t\t\t# log temporary
+    files equal or larger\n\t\t\t\t\t# than the specified size in kilobytes;\n\t\t\t\t\t#
+    -1 disables, 0 logs all temp files\n#log_timezone = 'GMT'\n\n#------------------------------------------------------------------------------\n#
+    ALARM\n#------------------------------------------------------------------------------\nenable_alarm
+    = on\nconnection_alarm_rate = 0.9\nalarm_report_interval = 10\nalarm_component
+    = '/opt/huawei/snas/bin/snas_cm_cmd'\n\n#------------------------------------------------------------------------------\n#
+    RUNTIME STATISTICS\n#------------------------------------------------------------------------------\n\n#
+    - Query/Index Statistics Collector -\n\n#track_activities = on\n#track_counts
+    = on\n#track_io_timing = off\n#track_functions = none\t\t\t# none, pl, all\n#track_activity_query_size
+    = 1024 \t# (change requires restart)\n#update_process_title = on\n#stats_temp_directory
+    = 'pg_stat_tmp'\n#track_thread_wait_status_interval = 30min # 0 to disable\n#track_sql_count
+    = off\n#enbale_instr_track_wait = on\n\n# - Statistics Monitoring -\n\n#log_parser_stats
+    = off\n#log_planner_stats = off\n#log_executor_stats = off\n#log_statement_stats
+    = off\n\n#------------------------------------------------------------------------------\n#
+    WORKLOAD MANAGER\n#------------------------------------------------------------------------------\n\nuse_workload_manager
+    = on\t\t# Enables workload manager in the system.\n\t\t\t\t\t# (change requires
+    restart)\n\n#cpu_collect_timer = 30\n\n#------------------------------------------------------------------------------\n#
+    AUTOVACUUM PARAMETERS\n#------------------------------------------------------------------------------\n\n#autovacuum
+    = off\t\t\t# Enable autovacuum subprocess?  default value is 'off'\n\t\t\t\t\t#
+    requires track_counts to also be on.\n#log_autovacuum_min_duration = -1\t# -1
+    disables, 0 logs all actions and\n\t\t\t\t\t# their durations, > 0 logs only\n\t\t\t\t\t#
+    actions running at least this number\n\t\t\t\t\t# of milliseconds.\n#autovacuum_max_workers
+    = 3\t\t# max number of autovacuum subprocesses\n\t\t\t\t\t# (change requires restart)\n#autovacuum_naptime
+    = 1min\t\t# time between autovacuum runs\n#autovacuum_vacuum_threshold = 50\t#
+    min number of row updates before\n\t\t\t\t\t# vacuum\n#autovacuum_analyze_threshold
+    = 50\t# min number of row updates before\n\t\t\t\t\t# analyze\n#autovacuum_vacuum_scale_factor
+    = 0.2\t# fraction of table size before vacuum\n#autovacuum_analyze_scale_factor
+    = 0.1\t# fraction of table size before analyze\n#autovacuum_freeze_max_age = 200000000\t#
+    maximum XID age before forced vacuum\n\t\t\t\t\t# (change requires restart)\n#autovacuum_vacuum_cost_delay
+    = 20ms\t# default vacuum cost delay for\n\t\t\t\t\t# autovacuum, in milliseconds;\n\t\t\t\t\t#
+    -1 means use vacuum_cost_delay\n#autovacuum_vacuum_cost_limit = -1\t# default
+    vacuum cost limit for\n\t\t\t\t\t# autovacuum, -1 means use\n\t\t\t\t\t# vacuum_cost_limit\n\n\n#------------------------------------------------------------------------------\n#
+    CLIENT CONNECTION DEFAULTS\n#------------------------------------------------------------------------------\n\n#
+    - Statement Behavior -\n#client_min_messages = notice      # values in order of
+    decreasing detail:\n                   #   debug5\n                   #   debug4\n
+    \                  #   debug3\n                   #   debug2\n                   #
+    \  debug1\n                   #   log\n                   #   notice\n                   #
+    \  warning\n                   #   error\n#search_path = '\"$user\",public'\t\t#
+    schema names\n#default_tablespace = ''\t\t# a tablespace name, '' uses the default\n#temp_tablespaces
+    = ''\t\t\t# a list of tablespace names, '' uses\n\t\t\t\t\t# only default tablespace\n#check_function_bodies
+    = on\n#default_transaction_isolation = 'read committed'\n#default_transaction_read_only
+    = off\n#default_transaction_deferrable = off\n#session_replication_role = 'origin'\n#statement_timeout
+    = 0\t\t\t# in milliseconds, 0 is disabled\n#vacuum_freeze_min_age = 50000000\n#vacuum_freeze_table_age
+    = 150000000\n#bytea_output = 'hex'\t\t\t# hex, escape\n#xmlbinary = 'base64'\n#xmloption
+    = 'content'\n#max_compile_functions = 1000\n#gin_pending_list_limit = 4MB\n# -
+    Locale and Formatting -\n\n#datestyle = 'iso, mdy'\n#intervalstyle = 'postgres'\n#timezone
+    = 'GMT'\n#timezone_abbreviations = 'Default'     # Select the set of available
+    time zone\n\t\t\t\t\t# abbreviations.  Currently, there are\n\t\t\t\t\t#   Default\n\t\t\t\t\t#
+    \  Australia\n\t\t\t\t\t#   India\n\t\t\t\t\t# You can create your own file in\n\t\t\t\t\t#
+    share/timezonesets/.\n#extra_float_digits = 0\t\t\t# min -15, max 3\n#client_encoding
+    = sql_ascii\t\t# actually, defaults to database\n\t\t\t\t\t# encoding\n\n# These
+    settings are initialized by initdb, but they can be changed.\n#lc_messages = 'C'\t\t\t#
+    locale for system error message\n\t\t\t\t\t# strings\n#lc_monetary = 'C'\t\t\t#
+    locale for monetary formatting\n#lc_numeric = 'C'\t\t\t# locale for number formatting\n#lc_time
+    = 'C'\t\t\t\t# locale for time formatting\n\n# default configuration for text
+    search\n#default_text_search_config = 'pg_catalog.simple'\n\n# - Other Defaults
+    -\n\n#dynamic_library_path = '$libdir'\n#local_preload_libraries = ''\n\n\n#------------------------------------------------------------------------------\n#
+    LOCK MANAGEMENT\n#------------------------------------------------------------------------------\n\n#deadlock_timeout
+    = 1s\nlockwait_timeout = 1200s\t\t# Max of lockwait_timeout and deadlock_timeout
+    + 1s\n#max_locks_per_transaction = 256\t\t# min 10\n\t\t\t\t\t# (change requires
+    restart)\n# Note:  Each lock table slot uses ~270 bytes of shared memory, and
+    there are\n# max_locks_per_transaction * (max_connections + max_prepared_transactions)\n#
+    lock table slots.\n#max_pred_locks_per_transaction = 64\t# min 10\n\t\t\t\t\t#
+    (change requires restart)\n#gs_clean_timeout = 300\t\t\t# sets the timeout to
+    call gs_clean\n\t\t\t\t\t# in seconds, 0 is disabled\n\n#------------------------------------------------------------------------------\n#
+    VERSION/PLATFORM COMPATIBILITY\n#------------------------------------------------------------------------------\n\n#
+    - Previous PostgreSQL Versions -\n\n#array_nulls = on\n#backslash_quote = safe_encoding\t#
+    on, off, or safe_encoding\n#default_with_oids = off\n#escape_string_warning =
+    on\n#lo_compat_privileges = off\n#quote_all_identifiers = off\n#sql_inheritance
+    = on\n#standard_conforming_strings = on\n#synchronize_seqscans = on\n\n# - Other
+    Platforms and Clients -\n\n#transform_null_equals = off\n\n##------------------------------------------------------------------------------\n#
+    ERROR HANDLING\n#------------------------------------------------------------------------------\n\n#exit_on_error
+    = off\t\t\t# terminate session on any error?\n#restart_after_crash = on\t\t# reinitialize
+    after backend crash?\n#omit_encoding_error = off\t\t# omit untranslatable character
+    error\n#data_sync_retry = off\t\t\t# retry or panic on failure to fsync data?\n\n#------------------------------------------------------------------------------\n#
+    DATA NODES AND CONNECTION POOLING\n#------------------------------------------------------------------------------\n#pooler_maximum_idle_time
+    = 60\t\t# Maximum idle time of the pooler links.\n\t\t\t\t\t# in minutes; 0 disables\n#minimum_pool_size
+    = 200\t\t\t# Initial pool size\n\t\t\t\t\t# (change requires restart)\n#pooler_connect_max_loops
+    = 1\t    # Max retries of the Pooler Connecting to Other Nodes\n\t\t\t\t\t# (change
+    requires restart)\n#pooler_connect_interval_time = 15\t# Indicates the interval
+    for each retry..\n\t\t\t\t\t# in seconds; 0 disables\n#cache_connection = on  \t\t#
+    pooler cache connection\n\n#------------------------------------------------------------------------------\n#
+    GTM CONNECTION\n#------------------------------------------------------------------------------\n\n#pgxc_node_name
+    = ''\t\t\t# The database node name\n\t\t\t\t\t# (change requires restart)\n\n##------------------------------------------------------------------------------\n#
+    OTHER PG-XC OPTIONS\n#------------------------------------------------------------------------------\n#enforce_two_phase_commit
+    = on\t\t# Enforce the usage of two-phase commit on transactions\n\t\t\t\t\t# where
+    temporary objects are used or ON COMMIT actions\n\t\t\t\t\t# are pending.\n\t\t\t\t\t#
+    Usage of commit instead of two-phase commit may break\n\t\t\t\t\t# data consistency
+    so use at your own risk.\n\n# - Postgres-XC specific Planner Method Configuration\n\n#------------------------------------------------------------------------------\n#
+    AUDIT\n#------------------------------------------------------------------------------\n\naudit_enabled
+    = on\n#audit_directory = 'pg_audit'\n#audit_data_format = 'binary'\n#audit_rotation_interval
+    = 1d\n#audit_rotation_size = 10MB\n#audit_space_limit = 1024MB\n#audit_file_remain_threshold
+    = 1048576\n#audit_login_logout = 7\n#audit_database_process = 1\n#audit_user_locked
+    = 1\n#audit_user_violation = 0\n#audit_grant_revoke = 1\n#audit_system_object
+    = 12295\n#audit_dml_state = 0\n#audit_dml_state_select = 0\n#audit_function_exec
+    = 0\n#audit_copy_exec = 0\n#audit_set_parameter = 1\t\t# whether audit set parameter
+    operation\n#enable_performace_data = normal #Choose which style to print the explain
+    info, normal,pretty,summary,run\n#explain_perf_mode = normal\n#------------------------------------------------------------------------------\n#
+    CUSTOMIZED OPTIONS\n#------------------------------------------------------------------------------\n\n#
+    Add settings for extensions here\n\n# ENABLE DATABASE PRIVILEGES SEPARATE\n#------------------------------------------------------------------------------\n#enableSeparationOfDuty
+    = off\n#------------------------------------------------------------------------------\n\n\n#------------------------------------------------------------------------------\n#
+    ADIO \n#------------------------------------------------------------------------------\n#enable_adio_function
+    = off\n#enable_fast_allocate = off\n#prefetch_quantity = 32MB\n#backwrite_quantity
+    = 8MB\n#cstore_prefetch_quantity = 32768\t\t#unit kb\n#cstore_backwrite_quantity
+    = 8192\t\t#unit kb\n#cstore_backwrite_max_threshold =  2097152\t\t#unit kb\n#fast_extend_file_size
+    = 8192\t\t#unit kb\n\n#------------------------------------------------------------------------------\n#
+    LLVM\n#------------------------------------------------------------------------------\n#enable_codegen
+    = on\t\t\t# consider use LLVM optimization\n#enable_codegen_print = off\t\t# dump
+    the IR function\n#codegen_cost_threshold = 10000\t\t# the threshold to allow use
+    LLVM Optimization\n\n#------------------------------------------------------------------------------\n#
+    JOB SCHEDULER OPTIONS\n#------------------------------------------------------------------------------\njob_queue_processes
+    = 10        # Number of concurrent jobs, optional: [0..1000], default: 10.\n\n#------------------------------------------------------------------------------\n#
+    NODEGROUP OPTIONS\n#------------------------------------------------------------------------------\ndefault_storage_nodegroup
+    = 'installation'      # Default storage group, when TO GROUP is not specified
+    in create-table clause, \n                            # the created table is distributed
+    into default storage node group, \n                            # “installation”
+    is preserved key words to indicate create table into \"installation group\" when
+    there is no TO-GROUP in DDL.\nexpected_computing_nodegroup = 'query'   # Use node
+    group as target computing nodegroup, \n                            # where any
+    JOIN/AGG operation goes there to do actual computation works.\n\n\npassword_encryption_type
+    = 0\nport = 5432\nlisten_addresses = '0.0.0.0'\nmost_available_sync = on\nremote_read_mode
+    = non_authentication\n\n"
