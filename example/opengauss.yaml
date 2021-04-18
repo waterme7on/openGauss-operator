@@ -6,5 +6,7 @@ spec:
   image: opengauss:debug
   imagePullPolicy: IfNotPresent
   opengauss:
-    master: 1
-    replicas: 0
+    master:
+      replicas: 1
+    worker:
+      replicas: 0

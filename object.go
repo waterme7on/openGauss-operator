@@ -52,11 +52,11 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	switch id {
 	case Master:
 		formatter = util.Master(og.Name)
-		res.Spec.Replicas = util.Int32Ptr(int32(og.Spec.OpenGauss.Master))
+		res.Spec.Replicas = util.Int32Ptr(*og.Spec.OpenGauss.Master.Replicas)
 		break
 	case Replicas:
 		formatter = util.Replica(og.Name)
-		res.Spec.Replicas = util.Int32Ptr(int32(og.Spec.OpenGauss.Replicas))
+		res.Spec.Replicas = util.Int32Ptr(*og.Spec.OpenGauss.Worker.Replicas)
 		break
 	default:
 		return
