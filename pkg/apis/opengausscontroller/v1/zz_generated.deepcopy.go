@@ -128,6 +128,11 @@ func (in *OpenGaussSpec) DeepCopyInto(out *OpenGaussSpec) {
 		*out = new(OpenGaussClusterConfiguration)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Resources != nil {
+		in, out := &in.Resources, &out.Resources
+		*out = new(corev1.ResourceRequirements)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -148,11 +153,6 @@ func (in *OpenGaussStatefulSet) DeepCopyInto(out *OpenGaussStatefulSet) {
 		in, out := &in.Replicas, &out.Replicas
 		*out = new(int32)
 		**out = **in
-	}
-	if in.Resources != nil {
-		in, out := &in.Resources, &out.Resources
-		*out = new(corev1.ResourceRequirements)
-		(*in).DeepCopyInto(*out)
 	}
 	return
 }

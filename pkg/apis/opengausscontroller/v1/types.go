@@ -22,6 +22,7 @@ type OpenGaussSpec struct {
 	Image           string                         `json:"image"`
 	ImagePullPolicy string                         `json:"imagePullPolicy"`
 	OpenGauss       *OpenGaussClusterConfiguration `json:"opengauss"`
+	Resources       *corev1.ResourceRequirements   `json:"resources,omitempty"`
 }
 
 // Define OpenGauss's needs for master and replicas
@@ -31,8 +32,7 @@ type OpenGaussClusterConfiguration struct {
 }
 
 type OpenGaussStatefulSet struct {
-	Replicas  *int32                       `json:"replicas"`
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Replicas *int32 `json:"replicas"`
 }
 
 // OpenGauss Cluster's status

@@ -53,24 +53,10 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	case Master:
 		formatter = util.Master(og.Name)
 		res.Spec.Replicas = util.Int32Ptr(*og.Spec.OpenGauss.Master.Replicas)
-		// modify resources in Master field
-		if og.Spec.OpenGauss.Master.Resources != nil {
-			res.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
-				Limits:   og.Spec.OpenGauss.Master.Resources.Limits,
-				Requests: og.Spec.OpenGauss.Master.Resources.Requests,
-			}
-		}
 		break
 	case Replicas:
 		formatter = util.Replica(og.Name)
 		res.Spec.Replicas = util.Int32Ptr(*og.Spec.OpenGauss.Worker.Replicas)
-		// modify resources in Master field
-		if og.Spec.OpenGauss.Worker.Resources != nil {
-			res.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
-				Limits:   og.Spec.OpenGauss.Worker.Resources.Limits,
-				Requests: og.Spec.OpenGauss.Worker.Resources.Requests,
-			}
-		}
 		break
 	default:
 		return
@@ -89,6 +75,10 @@ type configmap struct {
 	Data       map[string]string `json:"data"`
 	Kind       string            `json:"kind"`
 	Metadata   map[string]string `json:"metadata"`
+}
+
+func NewPersistentVolumeClaim(og *v1.OpenGauss) *corev1.PersistentVolumeClaim {
+	return nil
 }
 
 func NewMasterConfigMap(og *v1.OpenGauss) (*unstructured.Unstructured, schema.GroupVersionResource) {
