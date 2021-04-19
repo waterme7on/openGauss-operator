@@ -19,10 +19,11 @@ type OpenGauss struct {
 }
 
 type OpenGaussSpec struct {
-	Image           string                         `json:"image"`
-	ImagePullPolicy string                         `json:"imagePullPolicy"`
-	OpenGauss       *OpenGaussClusterConfiguration `json:"opengauss"`
-	Resources       *corev1.ResourceRequirements   `json:"resources,omitempty"`
+	Image            string                         `json:"image"`
+	ImagePullPolicy  string                         `json:"imagePullPolicy"`
+	OpenGauss        *OpenGaussClusterConfiguration `json:"opengauss"`
+	Resources        *corev1.ResourceRequirements   `json:"resources,omitempty"`
+	StorageClassName string                         `json:"storageClassName,omitempty"`
 }
 
 // Define OpenGauss's needs for master and replicas

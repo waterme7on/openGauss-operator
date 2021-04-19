@@ -3,17 +3,35 @@
 */
 package util
 
-type FormatterInterface interface {
+type PersistentVolumeClaimFormatterInterface interface {
+	PersistentVolumeCLaimName() string
+}
+
+func PersistentVolumeClaimFormatter(configName string) *persistentVolumeClaimFormatter {
+	return &persistentVolumeClaimFormatter{
+		configName: configName,
+	}
+}
+
+type persistentVolumeClaimFormatter struct {
+	configName string
+}
+
+func (formatter *persistentVolumeClaimFormatter) PersistentVolumeCLaimName() string {
+	return formatter.configName + "-pvc"
+}
+
+type StatefulsetFormatterInterface interface {
 	StatefulSetName() string
 	ServiceName() string
 	ReplConnInfo() string
 	ConfigMapName() string
 }
 
-func Master(configName string) FormatterInterface {
+func Master(configName string) StatefulsetFormatterInterface {
 	return &MasterFormatter{configName: configName}
 }
-func Replica(configName string) FormatterInterface {
+func Replica(configName string) StatefulsetFormatterInterface {
 	return &ReplicaFormatter{configName: configName}
 }
 

@@ -32,6 +32,26 @@ const (
 	Replicas
 )
 
+// NewPersistentVolumeCLaim returns pvc according to og's configuration
+func NewPersistentVolumeClaim(og *v1.OpenGauss) *corev1.PersistentVolumeClaim {
+	formatter := util.PersistentVolumeClaimFormatter(og.Name)
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: formatter.PersistentVolumeCLaimName(),
+			Labels: map[string]string{
+				"app": og.Name,
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			Resources: *og.Spec.Resources,
+		},
+	}
+	if og.Spec.StorageClassName != "" {
+		pvc.Spec.StorageClassName = &og.Spec.StorageClassName
+	}
+	return pvc
+}
+
 // NewMasterStatefulsets returns master statefulset object
 func NewMasterStatefulsets(og *v1.OpenGauss) (sts *appsv1.StatefulSet) {
 	return NewStatefulsets(Master, og)
@@ -48,7 +68,7 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
 		*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGauss")),
 	}
-	var formatter util.FormatterInterface
+	var formatter util.StatefulsetFormatterInterface
 	switch id {
 	case Master:
 		formatter = util.Master(og.Name)
@@ -77,10 +97,6 @@ type configmap struct {
 	Metadata   map[string]string `json:"metadata"`
 }
 
-func NewPersistentVolumeClaim(og *v1.OpenGauss) *corev1.PersistentVolumeClaim {
-	return nil
-}
-
 func NewMasterConfigMap(og *v1.OpenGauss) (*unstructured.Unstructured, schema.GroupVersionResource) {
 	return NewConfigMap(Master, og)
 }
@@ -94,7 +110,7 @@ func NewReplicaConfigMap(og *v1.OpenGauss) (*unstructured.Unstructured, schema.G
 func NewConfigMap(id Identity, og *v1.OpenGauss) (*unstructured.Unstructured, schema.GroupVersionResource) {
 	unstructuredMap := loadConfigMapTemplate()
 	var replConnInfo string
-	var formatter util.FormatterInterface
+	var formatter util.StatefulsetFormatterInterface
 	if id == Master {
 		formatter = util.Master(og.Name)
 	} else {

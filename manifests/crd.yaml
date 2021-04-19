@@ -74,6 +74,8 @@ spec:
                 type: string
               imagePullPolicy:
                 type: string
+              storageClassName:
+                type: string
               opengauss:
                 type: object
                 required:
