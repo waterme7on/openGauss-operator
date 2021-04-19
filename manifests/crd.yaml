@@ -32,7 +32,7 @@ spec:
       description: The ready master number of opengauss cluster
       name: Master-Ready
       type: string
-    - jsonPath: .spec.opengauss.master
+    - jsonPath: .spec.opengauss.master.replicas
       description: The desired master number of opengauss cluster
       name: Master-Desire
       type: integer
@@ -40,7 +40,7 @@ spec:
       description: The ready replicas number of opengauss cluster
       name: Replicas-Ready
       type: string
-    - jsonPath: .spec.opengauss.replicas
+    - jsonPath: .spec.opengauss.worker.replicas
       description: The desired replicas number of opengauss cluster
       name: Replicas-Desire
       type: integer
