@@ -17,10 +17,10 @@ func (og *OpenGauss) IsReady() bool {
 
 // IsMasterDeployed check if opengauss's master is deployed
 func (og *OpenGauss) IsMasterDeployed() bool {
-	return og.Status.ReadyMaster == strconv.Itoa(og.Spec.OpenGauss.Master)
+	return og.Status.ReadyMaster == strconv.Itoa(int(*og.Spec.OpenGauss.Master.Replicas))
 }
 
 // IsReplicaDeployed check if opengauss's replicas is deployed
 func (og *OpenGauss) IsReplicaDeployed() bool {
-	return og.Status.ReadyReplicas == strconv.Itoa(og.Spec.OpenGauss.Replicas)
+	return og.Status.ReadyReplicas == strconv.Itoa(int(*og.Spec.OpenGauss.Worker.Replicas))
 }

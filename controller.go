@@ -271,8 +271,17 @@ func (c *Controller) syncHandler(key string) error {
 		if err != nil {
 			_, err = c.dynamicClient.Resource(masterConfigMapRes).Namespace(og.Namespace).Create(context.TODO(), masterConfigMap, v1.CreateOptions{})
 		}
-		masterStatefulset = NewMasterStatefulsets(og)
+		// create pvc
+		pvc := NewPersistentVolumeClaim(og)
+		_, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Get(context.TODO(), pvc.Name, v1.GetOptions{})
+		if err != nil {
+			klog.Infoln("create pvc for opengauss:", og.Name)
+			klog.Infoln(pvc)
+			_, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Create(context.TODO(), pvc, v1.CreateOptions{})
+		}
+
 		// then create statefulset
+		masterStatefulset = NewMasterStatefulsets(og)
 		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Create(context.TODO(), masterStatefulset, v1.CreateOptions{})
 		klog.Info("Deploy master statefulsets of OpenGauss:", key)
 	}
@@ -334,12 +343,12 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	// checked if replicas number are correct
-	if og.Spec.OpenGauss.Master != int(*masterStatefulset.Spec.Replicas) {
-		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, og.Spec.OpenGauss.Master, *masterStatefulset.Spec.Replicas)
+	if *og.Spec.OpenGauss.Master.Replicas != (*masterStatefulset.Spec.Replicas) {
+		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, *og.Spec.OpenGauss.Master.Replicas, *masterStatefulset.Spec.Replicas)
 		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewMasterStatefulsets(og), v1.UpdateOptions{})
 	}
-	if og.Spec.OpenGauss.Replicas != int(*replicasStatefulset.Spec.Replicas) {
-		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, og.Spec.OpenGauss.Replicas, *replicasStatefulset.Spec.Replicas)
+	if *og.Spec.OpenGauss.Worker.Replicas != (*replicasStatefulset.Spec.Replicas) {
+		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, *og.Spec.OpenGauss.Worker.Replicas, *replicasStatefulset.Spec.Replicas)
 		replicasStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewReplicaStatefulsets(og), v1.UpdateOptions{})
 	}
 	if err != nil {
@@ -368,7 +377,7 @@ func (c *Controller) updateOpenGaussStatus(og *opengaussv1.OpenGauss, masterStat
 	ogCopy.Status.ReplicasStatefulset = replicasStatefulset.Name
 	ogCopy.Status.ReadyMaster = (strconv.Itoa(int(masterStatefulset.Status.ReadyReplicas)))
 	ogCopy.Status.ReadyReplicas = (strconv.Itoa(int(replicasStatefulset.Status.ReadyReplicas)))
-	if int(masterStatefulset.Status.ReadyReplicas) == ogCopy.Spec.OpenGauss.Master && int(replicasStatefulset.Status.ReadyReplicas) == ogCopy.Spec.OpenGauss.Replicas {
+	if (masterStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Master.Replicas && (replicasStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Worker.Replicas {
 		ogCopy.Status.OpenGaussStatus = "READY"
 	}
 	ogCopy, err = c.openGaussClientset.MeloV1().OpenGausses(ogCopy.Namespace).UpdateStatus(context.TODO(), ogCopy, v1.UpdateOptions{})

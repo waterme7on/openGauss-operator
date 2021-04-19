@@ -13,7 +13,6 @@ import (
 	"github.com/waterme7on/openGauss-controller/util"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +31,33 @@ const (
 	Replicas
 )
 
+// NewPersistentVolumeCLaim returns pvc according to og's configuration
+func NewPersistentVolumeClaim(og *v1.OpenGauss) *corev1.PersistentVolumeClaim {
+	formatter := util.PersistentVolumeClaimFormatter(og.Name)
+	pvc := &corev1.PersistentVolumeClaim{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "PersistentVolumeClaim",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: formatter.PersistentVolumeCLaimName(),
+			Labels: map[string]string{
+				"app": og.Name,
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			Resources: *og.Spec.Resources,
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
+			},
+		},
+	}
+	if og.Spec.StorageClassName != "" {
+		pvc.Spec.StorageClassName = &og.Spec.StorageClassName
+	}
+	return pvc
+}
+
 // NewMasterStatefulsets returns master statefulset object
 func NewMasterStatefulsets(og *v1.OpenGauss) (sts *appsv1.StatefulSet) {
 	return NewStatefulsets(Master, og)
@@ -48,15 +74,15 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
 		*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGauss")),
 	}
-	var formatter util.FormatterInterface
+	var formatter util.StatefulsetFormatterInterface
 	switch id {
 	case Master:
 		formatter = util.Master(og.Name)
-		res.Spec.Replicas = util.Int32Ptr(int32(og.Spec.OpenGauss.Master))
+		res.Spec.Replicas = util.Int32Ptr(*og.Spec.OpenGauss.Master.Replicas)
 		break
 	case Replicas:
 		formatter = util.Replica(og.Name)
-		res.Spec.Replicas = util.Int32Ptr(int32(og.Spec.OpenGauss.Replicas))
+		res.Spec.Replicas = util.Int32Ptr(*og.Spec.OpenGauss.Worker.Replicas)
 		break
 	default:
 		return
@@ -66,7 +92,9 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res.Spec.Template.ObjectMeta.Labels["app"] = res.Name
 	res.Spec.Template.Spec.Containers[0].Name = res.Name
 	res.Spec.Template.Spec.Containers[0].Env[0].Value = formatter.ReplConnInfo()
-	res.Spec.Template.Spec.Volumes[0].ConfigMap.Name = formatter.ConfigMapName()
+	res.Spec.Template.Spec.Volumes[1].ConfigMap.Name = formatter.ConfigMapName()
+	pvcFormatter := util.PersistentVolumeClaimFormatter(og.Name)
+	res.Spec.Template.Spec.Volumes[0].PersistentVolumeClaim.ClaimName = pvcFormatter.PersistentVolumeCLaimName()
 	return
 }
 
@@ -90,7 +118,7 @@ func NewReplicaConfigMap(og *v1.OpenGauss) (*unstructured.Unstructured, schema.G
 func NewConfigMap(id Identity, og *v1.OpenGauss) (*unstructured.Unstructured, schema.GroupVersionResource) {
 	unstructuredMap := loadConfigMapTemplate()
 	var replConnInfo string
-	var formatter util.FormatterInterface
+	var formatter util.StatefulsetFormatterInterface
 	if id == Master {
 		formatter = util.Master(og.Name)
 	} else {
@@ -254,38 +282,43 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 					},
 					Volumes: []corev1.Volume{
 						{
-							"opengauss-config",
+							Name: "opengauss-pvc",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "",
+								},
+							},
+						},
+						{
+							Name: "opengauss-config",
 							// defined by files in /configs
-							corev1.VolumeSource{
+							VolumeSource: corev1.VolumeSource{
 								ConfigMap: &corev1.ConfigMapVolumeSource{
-									corev1.LocalObjectReference{
+									LocalObjectReference: corev1.LocalObjectReference{
 										Name: "opengauss-configmap",
 									},
-									[]corev1.KeyToPath{},
-									nil,
-									nil,
 								},
 							},
 						},
 					},
 				},
 			},
-			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "opengauss-pvc",
-					},
-					Spec: corev1.PersistentVolumeClaimSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								"storage": resource.MustParse("500Mi"),
-							},
-						},
-						StorageClassName: util.StrPtr("csi-lvm"),
-					},
-				},
-			},
+			// VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+			// 	{
+			// 		ObjectMeta: metav1.ObjectMeta{
+			// 			Name: "opengauss-pvc",
+			// 		},
+			// 		Spec: corev1.PersistentVolumeClaimSpec{
+			// 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			// 			Resources: corev1.ResourceRequirements{
+			// 				Requests: corev1.ResourceList{
+			// 					"storage": resource.MustParse("500Mi"),
+			// 				},
+			// 			},
+			// 			StorageClassName: util.StrPtr("csi-lvm"),
+			// 		},
+			// 	},
+			// },
 		},
 	}
 	return template

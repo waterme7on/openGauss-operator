@@ -1,6 +1,9 @@
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -16,15 +19,22 @@ type OpenGauss struct {
 }
 
 type OpenGaussSpec struct {
-	Image           string                         `json:"image"`
-	ImagePullPolicy string                         `json:"imagePullPolicy"`
-	OpenGauss       *OpenGaussClusterConfiguration `json:"opengauss"`
+	Image            string                         `json:"image"`
+	ImagePullPolicy  string                         `json:"imagePullPolicy"`
+	OpenGauss        *OpenGaussClusterConfiguration `json:"opengauss"`
+	Resources        *corev1.ResourceRequirements   `json:"resources,omitempty"`
+	StorageClassName string                         `json:"storageClassName,omitempty"`
 }
 
 // Define OpenGauss's needs for master and replicas
 type OpenGaussClusterConfiguration struct {
-	Master   int `json:"master"`   // Number of Master
-	Replicas int `json:"replicas"` // Number of Replicas
+	Master *OpenGaussStatefulSet `json:"master"` // Master Configuration
+	Worker *OpenGaussStatefulSet `json:"worker"` // Replicas Configuration
+}
+
+type OpenGaussStatefulSet struct {
+	Replicas  *int32                       `json:"replicas"`
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // OpenGauss Cluster's status

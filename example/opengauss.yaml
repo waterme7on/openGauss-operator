@@ -5,6 +5,12 @@ metadata:
 spec:
   image: opengauss:debug
   imagePullPolicy: IfNotPresent
+  resources:
+    requests:
+      storage: 500Mi
+  storageClassName: "csi-lvm"
   opengauss:
-    master: 1
-    replicas: 0
+    master:
+      replicas: 1
+    worker:
+      replicas: 0
