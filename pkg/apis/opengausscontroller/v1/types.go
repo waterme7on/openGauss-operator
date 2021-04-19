@@ -39,11 +39,12 @@ type OpenGaussStatefulSet struct {
 
 // OpenGauss Cluster's status
 type OpenGaussStatus struct {
-	OpenGaussStatus     string `json:"opengaussStatus"`               // OpenGauss if ready or not
-	ReadyMaster         string `json:"readyMaster,omitempty"`         // Ready Master number
-	ReadyReplicas       string `json:"readyReplicas,omitempty"`       // Ready Replicas number
-	MasterStatefulset   string `json:"masterStatefulset,omitempty"`   // name of master statefulset
-	ReplicasStatefulset string `json:"replicasStatefulset,omitempty"` // name of replicas statefulset
+	OpenGaussStatus           string `json:"opengaussStatus"`                     // OpenGauss if ready or not
+	ReadyMaster               string `json:"readyMaster,omitempty"`               // Ready Master number
+	ReadyReplicas             string `json:"readyReplicas,omitempty"`             // Ready Replicas number
+	MasterStatefulset         string `json:"masterStatefulset,omitempty"`         // name of master statefulset
+	ReplicasStatefulset       string `json:"replicasStatefulset,omitempty"`       // name of replicas statefulset
+	PersistentVolumeClaimName string `json:"persistentVolumeClaimName,omitempty"` // name of pvc
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

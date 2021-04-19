@@ -3,22 +3,29 @@
 */
 package util
 
+import (
+	"fmt"
+	"math"
+
+	v1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
+)
+
 type PersistentVolumeClaimFormatterInterface interface {
 	PersistentVolumeCLaimName() string
 }
 
-func PersistentVolumeClaimFormatter(configName string) *persistentVolumeClaimFormatter {
+func PersistentVolumeClaimFormatter(og *v1.OpenGauss) *persistentVolumeClaimFormatter {
 	return &persistentVolumeClaimFormatter{
-		configName: configName,
+		OpenGauss: og,
 	}
 }
 
 type persistentVolumeClaimFormatter struct {
-	configName string
+	OpenGauss *v1.OpenGauss
 }
 
 func (formatter *persistentVolumeClaimFormatter) PersistentVolumeCLaimName() string {
-	return formatter.configName + "-pvc"
+	return formatter.OpenGauss.Name + "-pvc"
 }
 
 type StatefulsetFormatterInterface interface {
@@ -28,54 +35,66 @@ type StatefulsetFormatterInterface interface {
 	ConfigMapName() string
 }
 
-func Master(configName string) StatefulsetFormatterInterface {
-	return &MasterFormatter{configName: configName}
+func Master(og *v1.OpenGauss) StatefulsetFormatterInterface {
+	return &MasterFormatter{OpenGauss: og}
 }
-func Replica(configName string) StatefulsetFormatterInterface {
-	return &ReplicaFormatter{configName: configName}
+func Replica(og *v1.OpenGauss) StatefulsetFormatterInterface {
+	return &ReplicaFormatter{OpenGauss: og}
 }
 
 type MasterFormatter struct {
-	configName string
+	OpenGauss *v1.OpenGauss
 }
 
 func (formatter *MasterFormatter) StatefulSetName() string {
-	return formatter.configName + "-masters"
+	return formatter.OpenGauss.Name + "-masters"
 }
 
 func (formatter *MasterFormatter) ServiceName() string {
-	return formatter.configName + "-master-service"
+	return formatter.OpenGauss.Name + "-master-service"
 }
 
 func (formatter *MasterFormatter) ReplConnInfo() string {
-	replica := Replica(formatter.configName)
-	replInfo := "replconninfo1 = 'localhost=" + formatter.StatefulSetName() + "-0" + " remotehost=" + replica.StatefulSetName() + "-0" + " localport=5434 localservice=5432 remoteport=5434 remoteservice=5432'\n"
+	replica := Replica(formatter.OpenGauss)
+	replicaStatefulsetName := replica.StatefulSetName()
+	workerSize := int(math.Max(float64(*formatter.OpenGauss.Spec.OpenGauss.Worker.Replicas), 1))
+	replInfo := ""
+	for i := 0; i < workerSize; i++ {
+		replInfo += fmt.Sprintf("replconninfo%d='localhost=%s-0 remotehost=%s-%d", i+1, formatter.StatefulSetName(), replicaStatefulsetName, i)
+		replInfo += " localport=5434 localservice=5432 remoteport=5434 remoteservice=5432'\n"
+	}
 	return replInfo
 }
 
 func (formatter *MasterFormatter) ConfigMapName() string {
-	return formatter.configName + "-master-config"
+	return formatter.OpenGauss.Name + "-master-config"
 
 }
 
 type ReplicaFormatter struct {
-	configName string
+	OpenGauss *v1.OpenGauss
 }
 
 func (formatter *ReplicaFormatter) StatefulSetName() string {
-	return formatter.configName + "-replicas"
+	return formatter.OpenGauss.Name + "-replicas"
 }
 
 func (formatter *ReplicaFormatter) ServiceName() string {
-	return formatter.configName + "-replicas-service"
+	return formatter.OpenGauss.Name + "-replicas-service"
 }
 
 func (formatter *ReplicaFormatter) ReplConnInfo() string {
-	master := Master(formatter.configName)
-	replInfo := "replconninfo1 = 'localhost=$POD_IP" + " remotehost=" + master.StatefulSetName() + "-0" + " localport=5434 localservice=5432 remoteport=5434 remoteservice=5432'\n"
+	master := Master(formatter.OpenGauss)
+	masterStatefulsetName := master.StatefulSetName()
+	workerSize := int(math.Max(float64(*formatter.OpenGauss.Spec.OpenGauss.Worker.Replicas), 1))
+	replInfo := ""
+	for i := 0; i < workerSize; i++ {
+		replInfo += fmt.Sprintf("replconninfo%d='localhost=%s-%d remotehost=%s-0", i+1, formatter.StatefulSetName(), i, masterStatefulsetName)
+		replInfo += " localport=5434 localservice=5432 remoteport=5434 remoteservice=5432'\n"
+	}
 	return replInfo
 }
 
 func (formatter *ReplicaFormatter) ConfigMapName() string {
-	return formatter.configName + "-replicas-config"
+	return formatter.OpenGauss.Name + "-replicas-config"
 }

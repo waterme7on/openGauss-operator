@@ -33,7 +33,7 @@ const (
 
 // NewPersistentVolumeCLaim returns pvc according to og's configuration
 func NewPersistentVolumeClaim(og *v1.OpenGauss) *corev1.PersistentVolumeClaim {
-	formatter := util.PersistentVolumeClaimFormatter(og.Name)
+	formatter := util.PersistentVolumeClaimFormatter(og)
 	pvc := &corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
@@ -77,11 +77,11 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	var formatter util.StatefulsetFormatterInterface
 	switch id {
 	case Master:
-		formatter = util.Master(og.Name)
+		formatter = util.Master(og)
 		res.Spec.Replicas = util.Int32Ptr(*og.Spec.OpenGauss.Master.Replicas)
 		break
 	case Replicas:
-		formatter = util.Replica(og.Name)
+		formatter = util.Replica(og)
 		res.Spec.Replicas = util.Int32Ptr(*og.Spec.OpenGauss.Worker.Replicas)
 		break
 	default:
@@ -93,7 +93,7 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res.Spec.Template.Spec.Containers[0].Name = res.Name
 	res.Spec.Template.Spec.Containers[0].Env[0].Value = formatter.ReplConnInfo()
 	res.Spec.Template.Spec.Volumes[1].ConfigMap.Name = formatter.ConfigMapName()
-	pvcFormatter := util.PersistentVolumeClaimFormatter(og.Name)
+	pvcFormatter := util.PersistentVolumeClaimFormatter(og)
 	res.Spec.Template.Spec.Volumes[0].PersistentVolumeClaim.ClaimName = pvcFormatter.PersistentVolumeCLaimName()
 	return
 }
@@ -120,9 +120,9 @@ func NewConfigMap(id Identity, og *v1.OpenGauss) (*unstructured.Unstructured, sc
 	var replConnInfo string
 	var formatter util.StatefulsetFormatterInterface
 	if id == Master {
-		formatter = util.Master(og.Name)
+		formatter = util.Master(og)
 	} else {
-		formatter = util.Replica(og.Name)
+		formatter = util.Replica(og)
 	}
 	replConnInfo = "\n" + formatter.ReplConnInfo() + "\n"
 	configMap := &unstructured.Unstructured{Object: unstructuredMap}
