@@ -69,6 +69,7 @@ spec:
             required:
               - image
               - opengauss
+              - resources
             properties:
               image:
                 type: string
@@ -76,6 +77,18 @@ spec:
                 type: string
               storageClassName:
                 type: string
+              resources:
+                type: object
+                required:
+                  - requests
+                properties:
+                  requests:
+                    type: object
+                    required:
+                      - storage
+                    properties:
+                      storage:
+                          type: string
               opengauss:
                 type: object
                 required:

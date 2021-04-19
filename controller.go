@@ -271,8 +271,17 @@ func (c *Controller) syncHandler(key string) error {
 		if err != nil {
 			_, err = c.dynamicClient.Resource(masterConfigMapRes).Namespace(og.Namespace).Create(context.TODO(), masterConfigMap, v1.CreateOptions{})
 		}
-		masterStatefulset = NewMasterStatefulsets(og)
+		// create pvc
+		pvc := NewPersistentVolumeClaim(og)
+		_, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Get(context.TODO(), pvc.Name, v1.GetOptions{})
+		if err != nil {
+			klog.Infoln("create pvc for opengauss:", og.Name)
+			klog.Infoln(pvc)
+			_, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Create(context.TODO(), pvc, v1.CreateOptions{})
+		}
+
 		// then create statefulset
+		masterStatefulset = NewMasterStatefulsets(og)
 		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Create(context.TODO(), masterStatefulset, v1.CreateOptions{})
 		klog.Info("Deploy master statefulsets of OpenGauss:", key)
 	}

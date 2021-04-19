@@ -33,7 +33,8 @@ type OpenGaussClusterConfiguration struct {
 }
 
 type OpenGaussStatefulSet struct {
-	Replicas *int32 `json:"replicas"`
+	Replicas  *int32                       `json:"replicas"`
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // OpenGauss Cluster's status
