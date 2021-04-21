@@ -2,22 +2,50 @@
 
 The openGauss-controller uses the [client-go](https://github.com/kubernetes/client-go) library to develop a custom controller monitoring, scheduling and updating openGauss cluster in kubernetes.
 
-## Build & Run
+### Table of Content
 
+- [Build & Run](#Build-&-Run)
+- [Structure](#Structure)
+- [Develop](#Develop)
+
+
+
+---
+
+## Build & Run
+### Deploy Prometheus Monitoring
+
+Use prometheus to monitor the pod and node status.
+
+Follow [kube-prometheus quick start](https://github.com/prometheus-operator/kube-prometheus#quickstart) to install prometheus stack.
+
+### Deploy OpenGauss controller
+
+Fetch the project
 ```
-# Fetch the project
 git clone https://github.com/waterme7on/openGauss-controller.git
 cd openGauss-controller
+```
 
-# Build
+Build and Run
+```
 go build -o controller .
 # kubeconfig won't be needed if run in-cluster
 ./controller -kubeconfig=$HOME/.kube/config
+```
 
+Create Crd and example OpenGauss cluster
+
+```
 # create openGauss CustomResourceDefination
 kubectl create -f manifests/crd.yaml
 # create a openGauss object
 kubectl create -f example/opengauss.yaml
+```
+
+Check status
+
+```
 # check all the components of opengauss defined by example
 kubect get all | grep opengauss
 ```
