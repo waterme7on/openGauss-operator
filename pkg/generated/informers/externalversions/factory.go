@@ -24,6 +24,7 @@ import (
 	time "time"
 
 	versioned "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
+	autoscaler "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/autoscaler"
 	internalinterfaces "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/internalinterfaces"
 	opengausscontroller "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/opengausscontroller"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -172,9 +173,14 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
-	Melo() opengausscontroller.Interface
+	Scaler() autoscaler.Interface
+	Controller() opengausscontroller.Interface
 }
 
-func (f *sharedInformerFactory) Melo() opengausscontroller.Interface {
+func (f *sharedInformerFactory) Scaler() autoscaler.Interface {
+	return autoscaler.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Controller() opengausscontroller.Interface {
 	return opengausscontroller.New(f, f.namespace, f.tweakListOptions)
 }

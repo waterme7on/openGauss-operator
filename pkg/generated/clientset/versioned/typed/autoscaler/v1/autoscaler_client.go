@@ -19,27 +19,27 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
+	v1 "github.com/waterme7on/openGauss-controller/pkg/apis/autoscaler/v1"
 	"github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
-type ControllerV1Interface interface {
+type ScalerV1Interface interface {
 	RESTClient() rest.Interface
-	OpenGaussesGetter
+	AutoScalersGetter
 }
 
-// ControllerV1Client is used to interact with features provided by the controller.k8s.do group.
-type ControllerV1Client struct {
+// ScalerV1Client is used to interact with features provided by the scaler.k8s.do group.
+type ScalerV1Client struct {
 	restClient rest.Interface
 }
 
-func (c *ControllerV1Client) OpenGausses(namespace string) OpenGaussInterface {
-	return newOpenGausses(c, namespace)
+func (c *ScalerV1Client) AutoScalers(namespace string) AutoScalerInterface {
+	return newAutoScalers(c, namespace)
 }
 
-// NewForConfig creates a new ControllerV1Client for the given config.
-func NewForConfig(c *rest.Config) (*ControllerV1Client, error) {
+// NewForConfig creates a new ScalerV1Client for the given config.
+func NewForConfig(c *rest.Config) (*ScalerV1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -48,12 +48,12 @@ func NewForConfig(c *rest.Config) (*ControllerV1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ControllerV1Client{client}, nil
+	return &ScalerV1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new ControllerV1Client for the given config and
+// NewForConfigOrDie creates a new ScalerV1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *ControllerV1Client {
+func NewForConfigOrDie(c *rest.Config) *ScalerV1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -61,9 +61,9 @@ func NewForConfigOrDie(c *rest.Config) *ControllerV1Client {
 	return client
 }
 
-// New creates a new ControllerV1Client for the given RESTClient.
-func New(c rest.Interface) *ControllerV1Client {
-	return &ControllerV1Client{c}
+// New creates a new ScalerV1Client for the given RESTClient.
+func New(c rest.Interface) *ScalerV1Client {
+	return &ScalerV1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {
@@ -81,7 +81,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *ControllerV1Client) RESTClient() rest.Interface {
+func (c *ScalerV1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

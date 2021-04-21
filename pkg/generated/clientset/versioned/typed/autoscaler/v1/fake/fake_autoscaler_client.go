@@ -19,22 +19,22 @@ limitations under the License.
 package fake
 
 import (
-	v1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1"
+	v1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/autoscaler/v1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeControllerV1 struct {
+type FakeScalerV1 struct {
 	*testing.Fake
 }
 
-func (c *FakeControllerV1) OpenGausses(namespace string) v1.OpenGaussInterface {
-	return &FakeOpenGausses{c, namespace}
+func (c *FakeScalerV1) AutoScalers(namespace string) v1.AutoScalerInterface {
+	return &FakeAutoScalers{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeControllerV1) RESTClient() rest.Interface {
+func (c *FakeScalerV1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

@@ -21,6 +21,7 @@ package externalversions
 import (
 	"fmt"
 
+	autoscalerv1 "github.com/waterme7on/openGauss-controller/pkg/apis/autoscaler/v1"
 	v1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
@@ -52,9 +53,13 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=melo.k8s.do, Version=v1
+	// Group=controller.k8s.do, Version=v1
 	case v1.SchemeGroupVersion.WithResource("opengausses"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Melo().V1().OpenGausses().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Controller().V1().OpenGausses().Informer()}, nil
+
+		// Group=scaler.k8s.do, Version=v1
+	case autoscalerv1.SchemeGroupVersion.WithResource("autoscalers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Scaler().V1().AutoScalers().Informer()}, nil
 
 	}
 

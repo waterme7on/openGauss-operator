@@ -1,0 +1,8 @@
+apiVersion: "scaler.k8s.do/v1"
+kind: AutoScaler
+metadata:
+  name: test-autoscaler
+spec:
+  cluster:
+    name: test-opengauss
+    namespace: default
