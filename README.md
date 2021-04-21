@@ -9,9 +9,6 @@ The openGauss-controller uses the [client-go](https://github.com/kubernetes/clie
 - [Develop](#Develop)
 
 
-
----
-
 ## Build & Run
 ### Deploy Prometheus Monitoring
 
