@@ -284,10 +284,19 @@ func (c *Controller) syncHandler(key string) error {
 		pvcConfig := NewPersistentVolumeClaim(og)
 		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Get(context.TODO(), pvcConfig.Name, v1.GetOptions{})
 		if err != nil {
+      // create new pvc
 			klog.Infoln("create pvc for opengauss:", og.Name)
 			pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Create(context.TODO(), pvcConfig, v1.CreateOptions{})
+			if err != nil {
+				return err
+			}
+		} else {
+      // (try to) update old pvc
+			pv, _ := c.kubeClientset.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, v1.GetOptions{})
+			*pv.Spec.Capacity.Storage() = *pvcConfig.Spec.Resources.Limits.Storage()
+			pv, err = c.kubeClientset.CoreV1().PersistentVolumes().Update(context.TODO(), pv, v1.UpdateOptions{})
+			pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Update(context.TODO(), pvcConfig, v1.UpdateOptions{})
 		}
-
 		// then create statefulset
 		masterStatefulset = NewMasterStatefulsets(og)
 		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Create(context.TODO(), masterStatefulset, v1.CreateOptions{})
@@ -466,7 +475,7 @@ func (c *Controller) handleObjects(obj interface{}) {
 	if ownerRef := v1.GetControllerOf(object); ownerRef != nil {
 		// If this object is not owned by a Foo, we should not do anything more
 		// with it.
-		if ownerRef.Kind != "Foo" {
+		if ownerRef.Kind != "OpenGauss" {
 			return
 		}
 
