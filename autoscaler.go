@@ -12,11 +12,8 @@ import (
 	ogscheme "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/scheme"
 	informers "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/autoscaler/v1"
 	listers "github.com/waterme7on/openGauss-controller/pkg/generated/listers/autoscaler/v1"
-	"github.com/waterme7on/openGauss-controller/util"
-	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -240,40 +237,40 @@ func (c *AutoScalerController) syncHandler(key string) error {
 
 // createOrUpdateScaler creates or updates auto-scaler
 func (c *AutoScalerController) createOrUpdateAutoScaler(og *opengaussv1.OpenGauss, autoscaler *scalerv1.AutoScaler) error {
-	masterFormatter := util.Master(og)
-	var masterHpa *autoscaling.HorizontalPodAutoscaler
 	if autoscaler.Spec.Master == nil && autoscaler.Spec.Worker == nil {
 		return nil
 	}
-	// workerFormatter := util.Replica(og)
-	// var workerHpa *autoscaling.HorizontalPodAutoscaler
-	tmp, err := c.kubeClientset.AutoscalingV2beta2().HorizontalPodAutoscalers(og.Namespace).Get(context.TODO(), masterHpa.Name, v1.GetOptions{})
-	if err != nil {
-		// try to create
-		masterHpa = &autoscaling.HorizontalPodAutoscaler{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "HorizontalPodAutoscaler",
-				APIVersion: "autoscaling/v2beta2",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: masterFormatter.StatefulSetName(),
-			},
-			Spec: *autoscaler.Spec.Master.Spec,
+	if autoscaler.Spec.Master != nil {
+		masterHpaConfig := NewHorizontalPodAutoscaler(og, autoscaler, Master)
+		_, err := c.kubeClientset.AutoscalingV2beta2().HorizontalPodAutoscalers(og.Namespace).Get(context.TODO(), masterHpaConfig.Name, v1.GetOptions{})
+		if err != nil {
+			// not exist, try to create
+			_, err = c.kubeClientset.AutoscalingV2beta2().HorizontalPodAutoscalers(og.Namespace).Create(context.TODO(), masterHpaConfig, v1.CreateOptions{})
+		} else {
+			// exist, try to update
+			_, err = c.kubeClientset.AutoscalingV2beta2().HorizontalPodAutoscalers(og.Namespace).Update(context.TODO(), masterHpaConfig, v1.UpdateOptions{})
 		}
-		masterHpa.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
-			*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGauss")),
+		if err != nil {
+			klog.V(4).Infof("fail to create or update hpa for master: %s", og.Name)
+			return err
 		}
-		masterHpa, err = c.kubeClientset.AutoscalingV2beta2().HorizontalPodAutoscalers(og.Namespace).Create(context.TODO(), masterHpa, v1.CreateOptions{})
-	} else {
-		// try to update
-		masterHpa = tmp
-		masterHpa.Spec = *autoscaler.Spec.Master.Spec
-		masterHpa, err = c.kubeClientset.AutoscalingV2beta2().HorizontalPodAutoscalers(og.Namespace).Update(context.TODO(), masterHpa, v1.UpdateOptions{})
 	}
-	if err != nil {
-		klog.V(4).Infoln("create autoscaler error:", autoscaler.Name)
+	if autoscaler.Spec.Worker != nil {
+		workerHpaConfig := NewHorizontalPodAutoscaler(og, autoscaler, Replicas)
+		_, err := c.kubeClientset.AutoscalingV2beta2().HorizontalPodAutoscalers(og.Namespace).Get(context.TODO(), workerHpaConfig.Name, v1.GetOptions{})
+		if err != nil {
+			// not exist, try to create
+			_, err = c.kubeClientset.AutoscalingV2beta2().HorizontalPodAutoscalers(og.Namespace).Create(context.TODO(), workerHpaConfig, v1.CreateOptions{})
+		} else {
+			// exist, try to update
+			_, err = c.kubeClientset.AutoscalingV2beta2().HorizontalPodAutoscalers(og.Namespace).Update(context.TODO(), workerHpaConfig, v1.UpdateOptions{})
+		}
+		if err != nil {
+			klog.V(4).Infof("fail to create or update hpa for worker: %s", og.Name)
+			return err
+		}
 	}
-	return err
+	return nil
 }
 
 // updateAutoScalerStatus
