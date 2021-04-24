@@ -30,9 +30,10 @@ echo package root: $PACKAGE_ROOT
 # --output-base    because this script should also be able to run inside the vendor dir of
 #                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
 #                  instead of the $GOPATH directly. For normal projects this can be dropped.
+# generate opengauss controller
 bash "${CODEGEN_PKG}"/generate-groups.sh "deepcopy,client,informer,lister" \
   ${PACKAGE_ROOT}/pkg/generated ${PACKAGE_ROOT}/pkg/apis \
-  opengausscontroller:v1 \
+  "opengausscontroller:v1 autoscaler:v1" \
   --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt \
   --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.."
   # -o ${PACKAGE_ROOT} # output to pkg/apis deepcopy, default value is pkg/apis/group/version/

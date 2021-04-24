@@ -12,6 +12,6 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
-// +groupName=controller.k8s.do
+// +groupName=scaler.k8s.do
 
 package v1

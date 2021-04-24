@@ -20,8 +20,10 @@ package fake
 
 import (
 	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
-	melov1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1"
-	fakemelov1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1/fake"
+	scalerv1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/autoscaler/v1"
+	fakescalerv1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/autoscaler/v1/fake"
+	controllerv1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1"
+	fakecontrollerv1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -76,7 +78,12 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 
 var _ clientset.Interface = &Clientset{}
 
-// MeloV1 retrieves the MeloV1Client
-func (c *Clientset) MeloV1() melov1.MeloV1Interface {
-	return &fakemelov1.FakeMeloV1{Fake: &c.Fake}
+// ScalerV1 retrieves the ScalerV1Client
+func (c *Clientset) ScalerV1() scalerv1.ScalerV1Interface {
+	return &fakescalerv1.FakeScalerV1{Fake: &c.Fake}
+}
+
+// ControllerV1 retrieves the ControllerV1Client
+func (c *Clientset) ControllerV1() controllerv1.ControllerV1Interface {
+	return &fakecontrollerv1.FakeControllerV1{Fake: &c.Fake}
 }

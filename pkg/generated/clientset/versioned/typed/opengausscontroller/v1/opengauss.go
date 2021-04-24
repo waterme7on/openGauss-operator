@@ -57,7 +57,7 @@ type openGausses struct {
 }
 
 // newOpenGausses returns a OpenGausses
-func newOpenGausses(c *MeloV1Client, namespace string) *openGausses {
+func newOpenGausses(c *ControllerV1Client, namespace string) *openGausses {
 	return &openGausses{
 		client: c.RESTClient(),
 		ns:     namespace,

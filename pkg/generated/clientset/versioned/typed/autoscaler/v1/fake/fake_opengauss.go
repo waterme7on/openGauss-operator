@@ -32,13 +32,13 @@ import (
 
 // FakeOpenGausses implements OpenGaussInterface
 type FakeOpenGausses struct {
-	Fake *FakeControllerV1
+	Fake *FakeMeloV1
 	ns   string
 }
 
-var opengaussesResource = schema.GroupVersionResource{Group: "controller.k8s.do", Version: "v1", Resource: "opengausses"}
+var opengaussesResource = schema.GroupVersionResource{Group: "melo.k8s.do", Version: "v1", Resource: "opengausses"}
 
-var opengaussesKind = schema.GroupVersionKind{Group: "controller.k8s.do", Version: "v1", Kind: "OpenGauss"}
+var opengaussesKind = schema.GroupVersionKind{Group: "melo.k8s.do", Version: "v1", Kind: "OpenGauss"}
 
 // Get takes name of the openGauss, and returns the corresponding openGauss object, and an error if there is any.
 func (c *FakeOpenGausses) Get(ctx context.Context, name string, options v1.GetOptions) (result *opengausscontrollerv1.OpenGauss, err error) {

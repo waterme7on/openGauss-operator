@@ -22,69 +22,69 @@ import (
 	"context"
 	time "time"
 
-	opengausscontrollerv1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
+	autoscalerv1 "github.com/waterme7on/openGauss-controller/pkg/apis/autoscaler/v1"
 	versioned "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/internalinterfaces"
-	v1 "github.com/waterme7on/openGauss-controller/pkg/generated/listers/opengausscontroller/v1"
+	v1 "github.com/waterme7on/openGauss-controller/pkg/generated/listers/autoscaler/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// OpenGaussInformer provides access to a shared informer and lister for
-// OpenGausses.
-type OpenGaussInformer interface {
+// AutoScalerInformer provides access to a shared informer and lister for
+// AutoScalers.
+type AutoScalerInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.OpenGaussLister
+	Lister() v1.AutoScalerLister
 }
 
-type openGaussInformer struct {
+type autoScalerInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewOpenGaussInformer constructs a new informer for OpenGauss type.
+// NewAutoScalerInformer constructs a new informer for AutoScaler type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewOpenGaussInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredOpenGaussInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewAutoScalerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredAutoScalerInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredOpenGaussInformer constructs a new informer for OpenGauss type.
+// NewFilteredAutoScalerInformer constructs a new informer for AutoScaler type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredOpenGaussInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredAutoScalerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ControllerV1().OpenGausses(namespace).List(context.TODO(), options)
+				return client.ScalerV1().AutoScalers(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ControllerV1().OpenGausses(namespace).Watch(context.TODO(), options)
+				return client.ScalerV1().AutoScalers(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&opengausscontrollerv1.OpenGauss{},
+		&autoscalerv1.AutoScaler{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *openGaussInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredOpenGaussInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *autoScalerInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredAutoScalerInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *openGaussInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&opengausscontrollerv1.OpenGauss{}, f.defaultInformer)
+func (f *autoScalerInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&autoscalerv1.AutoScaler{}, f.defaultInformer)
 }
 
-func (f *openGaussInformer) Lister() v1.OpenGaussLister {
-	return v1.NewOpenGaussLister(f.Informer().GetIndexer())
+func (f *autoScalerInformer) Lister() v1.AutoScalerLister {
+	return v1.NewAutoScalerLister(f.Informer().GetIndexer())
 }
