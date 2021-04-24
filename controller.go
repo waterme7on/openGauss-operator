@@ -284,12 +284,14 @@ func (c *Controller) syncHandler(key string) error {
 		pvcConfig := NewPersistentVolumeClaim(og)
 		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Get(context.TODO(), pvcConfig.Name, v1.GetOptions{})
 		if err != nil {
+      // create new pvc
 			klog.Infoln("create pvc for opengauss:", og.Name)
 			pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Create(context.TODO(), pvcConfig, v1.CreateOptions{})
 			if err != nil {
 				return err
 			}
 		} else {
+      // (try to) update old pvc
 			pv, _ := c.kubeClientset.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, v1.GetOptions{})
 			*pv.Spec.Capacity.Storage() = *pvcConfig.Spec.Resources.Limits.Storage()
 			pv, err = c.kubeClientset.CoreV1().PersistentVolumes().Update(context.TODO(), pv, v1.UpdateOptions{})
