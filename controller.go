@@ -6,6 +6,9 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	opengaussv1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
 	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
 	ogscheme "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/scheme"
@@ -251,16 +254,19 @@ func (c *Controller) syncHandler(key string) error {
 	}
 	klog.Info("Syncing status of OpenGauss ", og.Name)
 
+	// 1. check if all components are deployed, includes service, configmap, master and worker statefulsets
 	// check if status exist
 	masterStatefulSetName := ""
 	if og.Status != nil {
 		masterStatefulSetName = og.Status.MasterStatefulset
 	}
 
+	var pvc *corev1.PersistentVolumeClaim
 	// check the master state
 	var masterStatefulset *appsv1.StatefulSet
 	if masterStatefulSetName != "" {
 		masterStatefulset, err = c.statefulsetLister.StatefulSets(og.Namespace).Get(masterStatefulSetName)
+		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Get(context.TODO(), og.Status.PersistentVolumeClaimName, v1.GetOptions{})
 	}
 	if masterStatefulSetName == "" || masterStatefulset == nil || err != nil {
 		// haven't deployed master
@@ -269,15 +275,17 @@ func (c *Controller) syncHandler(key string) error {
 		// check if master configmap exists
 		_, err = c.kubeClientset.CoreV1().ConfigMaps(og.Namespace).Get(context.TODO(), masterConfigMap.GetName(), v1.GetOptions{})
 		if err != nil {
-			_, err = c.dynamicClient.Resource(masterConfigMapRes).Namespace(og.Namespace).Create(context.TODO(), masterConfigMap, v1.CreateOptions{})
+			err = c.createOrUpdateConfigMap(og.Namespace, masterConfigMap, masterConfigMapRes)
+			if err != nil {
+				return err
+			}
 		}
 		// create pvc
-		pvc := NewPersistentVolumeClaim(og)
-		_, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Get(context.TODO(), pvc.Name, v1.GetOptions{})
+		pvcConfig := NewPersistentVolumeClaim(og)
+		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Get(context.TODO(), pvcConfig.Name, v1.GetOptions{})
 		if err != nil {
 			klog.Infoln("create pvc for opengauss:", og.Name)
-			klog.Infoln(pvc)
-			_, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Create(context.TODO(), pvc, v1.CreateOptions{})
+			pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Create(context.TODO(), pvcConfig, v1.CreateOptions{})
 		}
 
 		// then create statefulset
@@ -303,7 +311,7 @@ func (c *Controller) syncHandler(key string) error {
 	// check the replica state
 	replicaStatefulsetName := ""
 	if og.Status != nil {
-		replicaStatefulsetName = og.Status.MasterStatefulset
+		replicaStatefulsetName = og.Status.ReplicasStatefulset
 	}
 	var replicasStatefulset *appsv1.StatefulSet
 	if replicaStatefulsetName != "" {
@@ -316,7 +324,10 @@ func (c *Controller) syncHandler(key string) error {
 		// check if master configmap exists
 		_, err = c.kubeClientset.CoreV1().ConfigMaps(og.Namespace).Get(context.TODO(), replicaConfigMap.GetName(), v1.GetOptions{})
 		if err != nil {
-			_, err = c.dynamicClient.Resource(relicaConfigMapRes).Namespace(og.Namespace).Create(context.TODO(), replicaConfigMap, v1.CreateOptions{})
+			err = c.createOrUpdateConfigMap(og.Namespace, replicaConfigMap, relicaConfigMapRes)
+			if err != nil {
+				return err
+			}
 		}
 		replicasStatefulset = NewReplicaStatefulsets(og)
 		// then create statefulset
@@ -330,6 +341,7 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
+	// 2. check if all components are controller by opengauss
 	// checked if statefulsets are controlled by this og resource
 	if !v1.IsControlledBy(masterStatefulset, og) {
 		msg := fmt.Sprintf(MessageResourceExists, masterStatefulSetName)
@@ -342,21 +354,31 @@ func (c *Controller) syncHandler(key string) error {
 		return fmt.Errorf(msg)
 	}
 
+	// 3. check if the status of all components satisfy
 	// checked if replicas number are correct
-	if *og.Spec.OpenGauss.Master.Replicas != (*masterStatefulset.Spec.Replicas) {
+	if *og.Spec.OpenGauss.Master.Replicas != (*masterStatefulset.Spec.Replicas) || *og.Spec.OpenGauss.Worker.Replicas != (*replicasStatefulset.Spec.Replicas) {
+		// update configmap
+		masterConfigMap, masterConfigMapRes := NewMasterConfigMap(og)
+		err = c.createOrUpdateConfigMap(og.Namespace, masterConfigMap, masterConfigMapRes)
+		replicaConfigMap, replicaConfigMapRes := NewReplicaConfigMap(og)
+		err = c.createOrUpdateConfigMap(og.Namespace, replicaConfigMap, replicaConfigMapRes)
+		// update statefulset
 		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, *og.Spec.OpenGauss.Master.Replicas, *masterStatefulset.Spec.Replicas)
 		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewMasterStatefulsets(og), v1.UpdateOptions{})
-	}
-	if *og.Spec.OpenGauss.Worker.Replicas != (*replicasStatefulset.Spec.Replicas) {
 		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, *og.Spec.OpenGauss.Worker.Replicas, *replicasStatefulset.Spec.Replicas)
 		replicasStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewReplicaStatefulsets(og), v1.UpdateOptions{})
+	}
+	// checked if persistent volume claims are correct
+	if *og.Spec.Resources.Requests.Storage() != *pvc.Spec.Resources.Requests.Storage() {
+		klog.V(4).Infof("Update OpenGauss pvc storage")
+		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Update(context.TODO(), NewPersistentVolumeClaim(og), v1.UpdateOptions{})
 	}
 	if err != nil {
 		return err
 	}
 
 	// finally update opengauss resource status
-	err = c.updateOpenGaussStatus(og, masterStatefulset, replicasStatefulset)
+	err = c.updateOpenGaussStatus(og, masterStatefulset, replicasStatefulset, pvc)
 	if err != nil {
 		return err
 	}
@@ -367,7 +389,11 @@ func (c *Controller) syncHandler(key string) error {
 }
 
 // update opengauss status
-func (c *Controller) updateOpenGaussStatus(og *opengaussv1.OpenGauss, masterStatefulset *appsv1.StatefulSet, replicasStatefulset *appsv1.StatefulSet) error {
+func (c *Controller) updateOpenGaussStatus(
+	og *opengaussv1.OpenGauss,
+	masterStatefulset *appsv1.StatefulSet,
+	replicasStatefulset *appsv1.StatefulSet,
+	pvc *corev1.PersistentVolumeClaim) error {
 	var err error
 	ogCopy := og.DeepCopy()
 	if ogCopy.Status == nil {
@@ -377,12 +403,27 @@ func (c *Controller) updateOpenGaussStatus(og *opengaussv1.OpenGauss, masterStat
 	ogCopy.Status.ReplicasStatefulset = replicasStatefulset.Name
 	ogCopy.Status.ReadyMaster = (strconv.Itoa(int(masterStatefulset.Status.ReadyReplicas)))
 	ogCopy.Status.ReadyReplicas = (strconv.Itoa(int(replicasStatefulset.Status.ReadyReplicas)))
+	ogCopy.Status.PersistentVolumeClaimName = pvc.Name
 	if (masterStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Master.Replicas && (replicasStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Worker.Replicas {
 		ogCopy.Status.OpenGaussStatus = "READY"
 	}
 	ogCopy, err = c.openGaussClientset.MeloV1().OpenGausses(ogCopy.Namespace).UpdateStatus(context.TODO(), ogCopy, v1.UpdateOptions{})
 	if err != nil {
 		klog.Infoln("Failed to update opengauss status:", ogCopy.Name, " error:", err)
+	}
+	return err
+}
+
+// createOrUpdateConfigMap creates or update configmap for opengauss
+func (c *Controller) createOrUpdateConfigMap(ns string, cm *unstructured.Unstructured, cmRes schema.GroupVersionResource) error {
+	klog.V(4).Infoln("try to create configmap:", cm.GetName())
+	_, err := c.dynamicClient.Resource(cmRes).Namespace(ns).Create(context.TODO(), cm, v1.CreateOptions{})
+	if err != nil {
+		klog.V(4).Infoln("failed to create, try to update configmap:", cm.GetName())
+		_, err = c.dynamicClient.Resource(cmRes).Namespace(ns).Update(context.TODO(), cm, v1.UpdateOptions{})
+	}
+	if err != nil {
+		klog.Infoln("failed to create or update configmap:", cm.GetName())
 	}
 	return err
 }
