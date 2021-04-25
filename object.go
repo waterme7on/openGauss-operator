@@ -87,6 +87,8 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	default:
 		return
 	}
+	res.Spec.Template.Spec.Containers[0].Image = og.Spec.Image
+
 	res.Name = formatter.StatefulSetName()
 	res.Spec.Selector.MatchLabels["app"] = res.Name
 	res.Spec.Template.ObjectMeta.Labels["app"] = res.Name
@@ -206,7 +208,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 					Containers: []corev1.Container{
 						{
 							Name:  "opengauss",
-							Image: "opengauss:debug",
+							Image: "waterme7on/opengauss:v1",
 							Args: []string{
 								"-M",
 								"primary",
