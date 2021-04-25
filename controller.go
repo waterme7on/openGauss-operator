@@ -339,7 +339,7 @@ func (c *Controller) syncHandler(key string) error {
 		if err != nil {
 			return err
 		}
-		*pv.Spec.Capacity.Storage() = *og.Spec.Resources.Requests.Storage()
+		pv.Spec.Capacity = og.Spec.Resources.Requests
 		pv, err = c.kubeClientset.CoreV1().PersistentVolumes().Update(context.TODO(), pv, v1.UpdateOptions{})
 		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Update(context.TODO(), NewPersistentVolumeClaim(og), v1.UpdateOptions{})
 	}
