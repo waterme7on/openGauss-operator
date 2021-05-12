@@ -83,6 +83,7 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	case Replicas:
 		formatter = util.Replica(og)
 		res.Spec.Replicas = util.Int32Ptr(*og.Spec.OpenGauss.Worker.Replicas)
+		res.Spec.Template.Spec.Containers[0].Args[1] = "standby"
 		break
 	default:
 		return
@@ -94,6 +95,7 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res.Spec.Template.ObjectMeta.Labels["app"] = res.Name
 	res.Spec.Template.Spec.Containers[0].Name = res.Name
 	res.Spec.Template.Spec.Containers[0].Env[0].Value = formatter.ReplConnInfo()
+	res.Spec.Template.Spec.InitContainers[0].Env[0].Value = formatter.ReplConnInfo()
 	res.Spec.Template.Spec.Volumes[1].ConfigMap.Name = formatter.ConfigMapName()
 	pvcFormatter := util.PersistentVolumeClaimFormatter(og)
 	res.Spec.Template.Spec.Volumes[0].PersistentVolumeClaim.ClaimName = pvcFormatter.PersistentVolumeCLaimName()
@@ -135,7 +137,9 @@ func NewConfigMap(id Identity, og *v1.OpenGauss) (*unstructured.Unstructured, sc
 	// transform []bytes to struct configmap to modify Data["postgresql.conf"]
 	json.Unmarshal(s, &configStruct)
 	// add replConnInfo according to og's id
+	// if id == Master {
 	configStruct.Data["postgresql.conf"] += replConnInfo
+	// }
 	s, _ = json.Marshal(configStruct)
 	configMap.UnmarshalJSON(s)
 
@@ -270,14 +274,46 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 									// SubPath:   "",
 								},
 								{
-									MountPath: "/etc/opengauss/postgresql.conf",
+									MountPath: "/etc/opengauss/",
+									Name:      "config-dir",
+									// SubPath:   "",
+								},
+							},
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:  "init",
+							Image: "busybox:1.28",
+							Command: []string{
+								"sh",
+								"-c",
+								"cp -f /etc/postgresql.conf /etc/opengauss/postgresql.conf && cp -f /etc/pg_hba.conf /etc/opengauss/pg_hba.conf && echo $REPL_CONN_INFO >> /etc/opengauss/postgresql.conf && cat /etc/opengauss/postgresql.conf",
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "REPL_CONN_INFO",
+									// missing remotehost=... and localhost=...
+									// master: set localhost to the first master pod name and remote host to first replica pod name
+									// replica: set localhost to $POD_IP and remote host to first master pod name
+									Value: "##########",
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/etc/postgresql.conf",
 									Name:      "opengauss-config",
 									SubPath:   "postgresql.conf",
 								},
 								{
-									MountPath: "/etc/opengauss/pg_hba.conf",
+									MountPath: "/etc/pg_hba.conf",
 									Name:      "opengauss-config",
 									SubPath:   "pg_hba.conf",
+								},
+								{
+									MountPath: "/etc/opengauss/",
+									Name:      "config-dir",
+									// SubPath:   "",
 								},
 							},
 						},
@@ -300,6 +336,12 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 										Name: "opengauss-configmap",
 									},
 								},
+							},
+						},
+						{
+							Name: "config-dir",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
 						},
 					},
