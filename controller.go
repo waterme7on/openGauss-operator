@@ -255,54 +255,25 @@ func (c *Controller) syncHandler(key string) error {
 	klog.Info("Syncing status of OpenGauss ", og.Name)
 
 	// 1. check if all components are deployed, includes service, configmap, master and worker statefulsets
-	// check if status exist
-	masterStatefulSetName := ""
-	if og.Status != nil {
-		masterStatefulSetName = og.Status.MasterStatefulset
-	}
-
+	// create or get pvc
 	var pvc *corev1.PersistentVolumeClaim
-	// check the master state
-	var masterStatefulset *appsv1.StatefulSet
-	if masterStatefulSetName != "" {
-		masterStatefulset, err = c.statefulsetLister.StatefulSets(og.Namespace).Get(masterStatefulSetName)
-		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Get(context.TODO(), og.Status.PersistentVolumeClaimName, v1.GetOptions{})
-	}
-	if masterStatefulSetName == "" || masterStatefulset == nil || err != nil {
-		// haven't deployed master
-		// firstly create configmap
-		masterConfigMap, masterConfigMapRes := NewMasterConfigMap(og)
-		// check if master configmap exists
-		_, err = c.kubeClientset.CoreV1().ConfigMaps(og.Namespace).Get(context.TODO(), masterConfigMap.GetName(), v1.GetOptions{})
-		if err != nil {
-			err = c.createOrUpdateConfigMap(og.Namespace, masterConfigMap, masterConfigMapRes)
-			if err != nil {
-				return err
-			}
-		}
-		// create pvc
-		pvcConfig := NewPersistentVolumeClaim(og)
-		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Get(context.TODO(), pvcConfig.Name, v1.GetOptions{})
-		if err != nil {
-      // create new pvc
-			klog.Infoln("create pvc for opengauss:", og.Name)
-			pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Create(context.TODO(), pvcConfig, v1.CreateOptions{})
-			if err != nil {
-				return err
-			}
-		} else {
-      // (try to) update old pvc
-			pv, _ := c.kubeClientset.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, v1.GetOptions{})
-			*pv.Spec.Capacity.Storage() = *pvcConfig.Spec.Resources.Limits.Storage()
-			pv, err = c.kubeClientset.CoreV1().PersistentVolumes().Update(context.TODO(), pv, v1.UpdateOptions{})
-			pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Update(context.TODO(), pvcConfig, v1.UpdateOptions{})
-		}
-		// then create statefulset
-		masterStatefulset = NewMasterStatefulsets(og)
-		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Create(context.TODO(), masterStatefulset, v1.CreateOptions{})
-		klog.Info("Deploy master statefulsets of OpenGauss:", key)
+	pvcConfig := NewPersistentVolumeClaim(og)
+	pvc, err = c.createOrGetPVC(og.Namespace, pvcConfig)
+	if err != nil {
+		return err
 	}
 
+	// create or update master configmap
+	masterConfigMap, masterConfigMapRes := NewMasterConfigMap(og)
+	err = c.createOrUpdateConfigMap(og.Namespace, masterConfigMap, masterConfigMapRes)
+	if err != nil {
+		return err
+	}
+
+	// create or get master statefulset
+	var masterStatefulset *appsv1.StatefulSet
+	masterStsConfig := NewMasterStatefulsets(og)
+	masterStatefulset, err = c.createOrGetStatefulset(og.Namespace, masterStsConfig)
 	// If an error occurs during Get/Create, we'll requeue the item so we can
 	// attempt processing again later. This could have been caused by a
 	// temporary network failure, or any other transient reason.
@@ -310,38 +281,22 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
-	// // check master service
-	// masterServiceName := masterStatefulset.Spec.Template.Spec.Volumes[0].ConfigMap.Name
-	// var masterService *corev1.Service
-	// masterService, err = c.serviceLister.Services(og.Namespace).Get(masterServiceName)
-	// if errors.IsNotFound(err) {
-	// }
+	// create or update replica configmap
+	replicaConfigMap, relicaConfigMapRes := NewReplicaConfigMap(og)
+	err = c.createOrUpdateConfigMap(og.Namespace, replicaConfigMap, relicaConfigMapRes)
+	if err != nil {
+		return err
+	}
 
-	// check the replica state
-	replicaStatefulsetName := ""
-	if og.Status != nil {
-		replicaStatefulsetName = og.Status.ReplicasStatefulset
-	}
+	// create or get replica statefulset
 	var replicasStatefulset *appsv1.StatefulSet
-	if replicaStatefulsetName != "" {
-		replicasStatefulset, err = c.statefulsetLister.StatefulSets(og.Namespace).Get(replicaStatefulsetName)
-	}
-	if replicaStatefulsetName == "" || replicasStatefulset == nil || err != nil {
-		// haven't deployed replicas
-		// firstly create configmap
-		replicaConfigMap, relicaConfigMapRes := NewReplicaConfigMap(og)
-		// check if master configmap exists
-		_, err = c.kubeClientset.CoreV1().ConfigMaps(og.Namespace).Get(context.TODO(), replicaConfigMap.GetName(), v1.GetOptions{})
-		if err != nil {
-			err = c.createOrUpdateConfigMap(og.Namespace, replicaConfigMap, relicaConfigMapRes)
-			if err != nil {
-				return err
-			}
-		}
-		replicasStatefulset = NewReplicaStatefulsets(og)
-		// then create statefulset
-		replicasStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Create(context.TODO(), replicasStatefulset, v1.CreateOptions{})
-		klog.Info("Deploy replicas statefulsets of OpenGauss:", key)
+	replicaStsConfig := NewReplicaStatefulsets(og)
+	replicasStatefulset, err = c.createOrGetStatefulset(og.Namespace, replicaStsConfig)
+	// If an error occurs during Get/Create, we'll requeue the item so we can
+	// attempt processing again later. This could have been caused by a
+	// temporary network failure, or any other transient reason.
+	if err != nil {
+		return err
 	}
 	// If an error occurs during Get/Create, we'll requeue the item so we can
 	// attempt processing again later. This could have been caused by a
@@ -353,12 +308,12 @@ func (c *Controller) syncHandler(key string) error {
 	// 2. check if all components are controller by opengauss
 	// checked if statefulsets are controlled by this og resource
 	if !v1.IsControlledBy(masterStatefulset, og) {
-		msg := fmt.Sprintf(MessageResourceExists, masterStatefulSetName)
+		msg := fmt.Sprintf(MessageResourceExists, masterStatefulset.Name)
 		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
 		return fmt.Errorf(msg)
 	}
 	if !v1.IsControlledBy(replicasStatefulset, og) {
-		msg := fmt.Sprintf(MessageResourceExists, replicaStatefulsetName)
+		msg := fmt.Sprintf(MessageResourceExists, replicasStatefulset.Name)
 		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
 		return fmt.Errorf(msg)
 	}
@@ -380,6 +335,12 @@ func (c *Controller) syncHandler(key string) error {
 	// checked if persistent volume claims are correct
 	if *og.Spec.Resources.Requests.Storage() != *pvc.Spec.Resources.Requests.Storage() {
 		klog.V(4).Infof("Update OpenGauss pvc storage")
+		// pv, err := c.kubeClientset.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, v1.GetOptions{})
+		// if err != nil {
+		// 	return err
+		// }
+		// pv.Spec.Capacity = og.Spec.Resources.Requests
+		// pv, err = c.kubeClientset.CoreV1().PersistentVolumes().Update(context.TODO(), pv, v1.UpdateOptions{})
 		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Update(context.TODO(), NewPersistentVolumeClaim(og), v1.UpdateOptions{})
 	}
 	if err != nil {
@@ -421,6 +382,35 @@ func (c *Controller) updateOpenGaussStatus(
 		klog.Infoln("Failed to update opengauss status:", ogCopy.Name, " error:", err)
 	}
 	return err
+}
+
+// createOrUpdatePVC creates or get pvc of opengauss
+func (c *Controller) createOrGetPVC(ns string, config *corev1.PersistentVolumeClaim) (pvc *corev1.PersistentVolumeClaim, err error) {
+	// get pvc
+	klog.V(4).Infoln("try to get pvc for opengauss:", config.Name)
+	pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), config.Name, v1.GetOptions{})
+	if err != nil {
+		// (try to) create pvc
+		klog.V(4).Infoln("try to create pvc for opengauss:", config.Name)
+		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), config, v1.CreateOptions{})
+	}
+	return
+}
+
+// createOrGetStatefulset creates or get statefulset of opengauss
+func (c *Controller) createOrGetStatefulset(ns string, config *appsv1.StatefulSet) (sts *appsv1.StatefulSet, err error) {
+	// get pvc
+	klog.V(4).Infoln("try to get statefulset for opengauss:", config.Name)
+	sts, err = c.kubeClientset.AppsV1().StatefulSets(ns).Get(context.TODO(), config.Name, v1.GetOptions{})
+	if err != nil {
+		// (try to) create pvc
+		klog.V(4).Infoln("try to create statefulset for opengauss:", config.Name)
+		sts, err = c.kubeClientset.AppsV1().StatefulSets(ns).Create(context.TODO(), config, v1.CreateOptions{})
+	}
+	if err != nil {
+		klog.V(4).Infoln(config.Spec)
+	}
+	return
 }
 
 // createOrUpdateConfigMap creates or update configmap for opengauss
