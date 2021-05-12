@@ -335,12 +335,12 @@ func (c *Controller) syncHandler(key string) error {
 	// checked if persistent volume claims are correct
 	if *og.Spec.Resources.Requests.Storage() != *pvc.Spec.Resources.Requests.Storage() {
 		klog.V(4).Infof("Update OpenGauss pvc storage")
-		pv, err := c.kubeClientset.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, v1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		pv.Spec.Capacity = og.Spec.Resources.Requests
-		pv, err = c.kubeClientset.CoreV1().PersistentVolumes().Update(context.TODO(), pv, v1.UpdateOptions{})
+		// pv, err := c.kubeClientset.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, v1.GetOptions{})
+		// if err != nil {
+		// 	return err
+		// }
+		// pv.Spec.Capacity = og.Spec.Resources.Requests
+		// pv, err = c.kubeClientset.CoreV1().PersistentVolumes().Update(context.TODO(), pv, v1.UpdateOptions{})
 		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Update(context.TODO(), NewPersistentVolumeClaim(og), v1.UpdateOptions{})
 	}
 	if err != nil {
