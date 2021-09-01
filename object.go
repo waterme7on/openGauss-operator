@@ -266,7 +266,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 									Value: "Enmo@123",
 								},
 							},
-							ImagePullPolicy: corev1.PullNever,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									MountPath: "/var/lib/opengauss",
