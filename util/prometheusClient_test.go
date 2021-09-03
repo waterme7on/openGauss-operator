@@ -28,5 +28,35 @@ func TestPrometheusClient(t *testing.T) {
 	if exp.Len() > 0 {
 		fmt.Printf("\tQuery Result: %s\n", exp[0])
 	}
-	fmt.Println("Pass: TestPrometheusClient")
+	fmt.Println("--Pass: TestPrometheusClient--")
+}
+
+func TestQuery(t *testing.T) {
+	address := "http://10.77.50.201:30364"
+	_, queryClient, err := GetPrometheusClient(address)
+	fmt.Println("Test util(TestQuery)")
+	if err != nil {
+		t.Fatalf("Cannot connect to prometheus: %s, %s", address, err.Error())
+	}
+	result, err := QueryPodCpuUsage("prometheus", queryClient)
+	if err != nil {
+		t.Fatalf("Cannot query prometheus: %s, %s", address, err.Error())
+	}
+	fmt.Printf("Cpu Usage:\n%s\n", result)
+	result, err = QueryPodCpuUsagePercentage("prometheus", queryClient)
+	if err != nil {
+		t.Fatalf("Cannot query prometheus: %s, %s", address, err.Error())
+	}
+	fmt.Printf("Cpu Usage Percentage:\n%s\n", result)
+	result, err = QueryPodMemoryUsage("prometheus", queryClient)
+	if err != nil {
+		t.Fatalf("Cannot query prometheus: %s, %s", address, err.Error())
+	}
+	fmt.Printf("Memory Usage:\n%s\n", result)
+	result, err = QueryPodMemoryUsagePercentage("prometheus", queryClient)
+	if err != nil {
+		t.Fatalf("Cannot query prometheus: %s, %s", address, err.Error())
+	}
+	fmt.Printf("Memory Usage Percentage:\n%s\n", result)
+	fmt.Printf("--- Pass: TestQuery --\n")
 }
