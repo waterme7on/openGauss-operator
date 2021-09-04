@@ -1,4 +1,4 @@
-package util
+package prometheusUtil
 
 const (
 	PodCpuUsage              = "sum(rate(container_cpu_usage_seconds_total{pod=~\"%s.*\"}[1m])) by (pod)"
