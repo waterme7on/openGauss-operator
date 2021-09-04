@@ -3,8 +3,16 @@ module github.com/waterme7on/openGauss-controller
 go 1.16
 
 require (
-	github.com/prometheus/client_golang v1.11.0 // indirect
-	github.com/prometheus/common v0.26.0 // indirect
+	github.com/golang/protobuf v1.5.2
+	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/common v0.26.0
+	golang.org/x/net v0.0.0-20210902165921-8d991716f632 // indirect
+	golang.org/x/sys v0.0.0-20210903071746-97244b99971b // indirect
+	golang.org/x/text v0.3.7 // indirect
+	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2 // indirect
+	google.golang.org/grpc v1.40.0
+	google.golang.org/grpc/examples v0.0.0-20210902184326-c93e472777b9
+	google.golang.org/protobuf v1.27.1
 	k8s.io/api v0.0.0-20210313025757-51a1c5553d68
 	k8s.io/apimachinery v0.0.0-20210313025227-57f2a0733447
 	k8s.io/client-go v0.0.0-00010101000000-000000000000

@@ -9,7 +9,7 @@ The openGauss-controller uses the [client-go](https://github.com/kubernetes/clie
 - [Develop](#Develop)
 
 
-## Build & Run
+## 1. Build & Run
 ### Deploy Prometheus Monitoring
 
 Use prometheus to monitor the pod and node status.
@@ -19,13 +19,13 @@ Follow [kube-prometheus quick start](https://github.com/prometheus-operator/kube
 ### Deploy OpenGauss controller
 
 Fetch the project
-```
+```sh
 git clone https://github.com/waterme7on/openGauss-controller.git
 cd openGauss-controller
 ```
 
 Build and Run
-```
+```sh
 go build -o controller .
 # kubeconfig won't be needed if run in-cluster
 ./controller -kubeconfig=$HOME/.kube/config
@@ -33,7 +33,7 @@ go build -o controller .
 
 Create Crd and example OpenGauss cluster
 
-```
+```sh
 # create openGauss CustomResourceDefination
 kubectl create -f manifests/crd.yaml
 # create a openGauss object
@@ -42,19 +42,19 @@ kubectl create -f example/opengauss.yaml
 
 Check status
 
-```
+```sh
 # check all the components of opengauss defined by example
 kubect get all | grep opengauss
 ```
 
 
-## Structure
+## 2. Structure
 
 ![](./docs/diagrams/operator.png)
 
 <br>
 
-## Develop
+## 3. Develop
 
 ### Use code-generator to update apis
 
@@ -64,7 +64,7 @@ You may need to manually install [code-generator](https://github.com/kubernetes/
 
 Build command:
 
-```
+```sh
 # get the code-generator
 go mod vendor
 # or use command "go get k8s.io/code-generator"
@@ -79,3 +79,12 @@ bash hack/update-codegen.sh
 how the various components in the [client-go](https://github.com/kubernetes/client-go) library work and their interaction points with the custom controller code
 
 ![](./docs/diagrams/client-go-controller-interaction.jpeg)
+
+### grpc code generate
+
+For protoc installation and instructions, see [grpc in go](https://grpc.io/docs/languages/go/)
+
+```sh
+cd rpc
+protoc --go_out=. --go_opt=paths=source_relative     --go-grpc_out=. --go-grpc_opt=paths=source_relative    protobuf/clients.proto
+```
