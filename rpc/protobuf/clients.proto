@@ -1,0 +1,18 @@
+syntax = "proto3";
+package controllerClient;
+option go_package = "github.com/waterme7on/openGauss-controller/rpc/protobuf";
+
+// Interface exported by the server.
+service OpenGaussController {
+  rpc Scale(ScaleRequest) returns (ScaleResponse) {}
+}
+
+message ScaleRequest {
+  string openGaussObjectKey = 1;  // namespace/name, e.g.: "default/test-openGauss"
+  int32 masterReplication = 3;
+  int32 workerReplication = 4;
+}
+
+message ScaleResponse {
+  bool success = 1;
+}
