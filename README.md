@@ -50,6 +50,14 @@ kubect get all | grep opengauss
 
 ## 2. Structure
 
+data flow and logic graph
+
+![](./docs/diagrams/logic.png)
+
+<br>
+
+components
+
 ![](./docs/diagrams/operator.png)
 
 <br>
