@@ -24,12 +24,19 @@ git clone https://github.com/waterme7on/openGauss-controller.git
 cd openGauss-controller
 ```
 
-Build and Run
+Build and Run in Process
 ```sh
 go build -o controller .
 # kubeconfig won't be needed if run in-cluster
 ./controller -kubeconfig=$HOME/.kube/config
 ```
+
+Or Run in Deploymente
+```sh
+kubectl apply -f manifests manifests/serviceaccount.yaml 
+kubectl apply -f manifests/deploy.yaml
+```
+
 
 Create Crd and example OpenGauss cluster
 
@@ -63,6 +70,13 @@ components
 <br>
 
 ## 3. Develop
+
+### Contributions
+
+1. modify
+2. git checkout -b xxx
+3. git push origin xxx:feat_xxx
+4. pull request
 
 ### Use code-generator to update apis
 
