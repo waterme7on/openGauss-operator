@@ -15,6 +15,7 @@ import (
 	grpc "google.golang.org/grpc"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -28,6 +29,7 @@ type openGaussRpcServer struct {
 }
 
 func (s *openGaussRpcServer) Scale(ctx context.Context, req *pb.ScaleRequest) (*pb.ScaleResponse, error) {
+	klog.Infof("Rpc server receive request: %s", req.String())
 	// Convert the namespace/name into a distinct namespace and name
 	namespace, name, err := cache.SplitMetaNamespaceKey(req.OpenGaussObjectKey)
 	response := &pb.ScaleResponse{Success: false}
@@ -60,6 +62,7 @@ func (s *openGaussRpcServer) Run() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
+	klog.Infof("rpc server listening at localhost:%d", *port)
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterOpenGaussControllerServer(grpcServer, s)
