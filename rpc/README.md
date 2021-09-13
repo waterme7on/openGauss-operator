@@ -7,6 +7,10 @@
 Scale(ctx context.Context, req *pb.ScaleRequest) (*pb.ScaleResponse, error)
 ```
 
+## Usage
+
+see `rpc/rpcClient_test.go func TestRpcClient` 
+
 ## Testing
 
 First run rpc server
