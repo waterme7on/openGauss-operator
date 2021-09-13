@@ -32,7 +32,6 @@ func TestRpcClient(t *testing.T) {
 	request := &pb.ScaleRequest{
 		OpenGaussObjectKey: "default/test-opengauss",
 		MasterReplication:  1,
-		WorkerReplication:  2,
 	}
 	response, err := client.Scale(context.TODO(), request)
 	if err != nil {

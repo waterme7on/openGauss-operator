@@ -5,14 +5,25 @@ option go_package = "github.com/waterme7on/openGauss-controller/rpc/protobuf";
 // Interface exported by the server.
 service OpenGaussController {
   rpc Scale(ScaleRequest) returns (ScaleResponse) {}
+  rpc Get(GetRequest) returns (GetResponse) {}
 }
 
 message ScaleRequest {
   string openGaussObjectKey = 1;  // namespace/name, e.g.: "default/test-openGauss"
-  int32 masterReplication = 3;
-  int32 workerReplication = 4;
+  int32 masterReplication = 2;
+  int32 workerReplication = 3;
 }
 
 message ScaleResponse {
   bool success = 1;
+}
+
+message GetRequest {
+  string openGaussObjectKey = 1;  // namespace/name, e.g.: "default/test-openGauss"
+}
+
+message GetResponse {
+  bool success = 1;
+  int32 masterReplication = 2;
+  int32 workerReplication = 3;
 }
