@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opengauss-operator
+  labels:
+    app: opengauss-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opengauss-operator
+  template:
+    metadata:
+      labels:
+        app: opengauss-operator
+    spec:
+      serviceAccountName: opengauss-operator
+      nodeSelector:
+        kubernetes.io/hostname: "worker205"
+      containers:
+      - name: operator
+        image: waterme7on/opengauss-operator:0.0.1
+        ports:
+        - containerPort: 17173
