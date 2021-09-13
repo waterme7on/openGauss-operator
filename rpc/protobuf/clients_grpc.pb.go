@@ -19,6 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type OpenGaussControllerClient interface {
 	Scale(ctx context.Context, in *ScaleRequest, opts ...grpc.CallOption) (*ScaleResponse, error)
+	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 }
 
 type openGaussControllerClient struct {
@@ -38,11 +39,21 @@ func (c *openGaussControllerClient) Scale(ctx context.Context, in *ScaleRequest,
 	return out, nil
 }
 
+func (c *openGaussControllerClient) Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error) {
+	out := new(GetResponse)
+	err := c.cc.Invoke(ctx, "/controllerClient.OpenGaussController/Get", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OpenGaussControllerServer is the server API for OpenGaussController service.
 // All implementations must embed UnimplementedOpenGaussControllerServer
 // for forward compatibility
 type OpenGaussControllerServer interface {
 	Scale(context.Context, *ScaleRequest) (*ScaleResponse, error)
+	Get(context.Context, *GetRequest) (*GetResponse, error)
 	mustEmbedUnimplementedOpenGaussControllerServer()
 }
 
@@ -52,6 +63,9 @@ type UnimplementedOpenGaussControllerServer struct {
 
 func (UnimplementedOpenGaussControllerServer) Scale(context.Context, *ScaleRequest) (*ScaleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Scale not implemented")
+}
+func (UnimplementedOpenGaussControllerServer) Get(context.Context, *GetRequest) (*GetResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
 func (UnimplementedOpenGaussControllerServer) mustEmbedUnimplementedOpenGaussControllerServer() {}
 
@@ -84,6 +98,24 @@ func _OpenGaussController_Scale_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OpenGaussController_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OpenGaussControllerServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/controllerClient.OpenGaussController/Get",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OpenGaussControllerServer).Get(ctx, req.(*GetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OpenGaussController_ServiceDesc is the grpc.ServiceDesc for OpenGaussController service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -94,6 +126,10 @@ var OpenGaussController_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Scale",
 			Handler:    _OpenGaussController_Scale_Handler,
+		},
+		{
+			MethodName: "Get",
+			Handler:    _OpenGaussController_Get_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

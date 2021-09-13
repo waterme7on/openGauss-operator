@@ -3,9 +3,21 @@
 ## Support API
 
 ```go
+// get openGauss master and worker replication stats
+Get(ctx context.Context, req *pb.GetRequest) (*pb.GetResponse, error)
 // scale master and worker replicas
 Scale(ctx context.Context, req *pb.ScaleRequest) (*pb.ScaleResponse, error)
 ```
+
+## Develop
+
+[protobuf documentation](https://developers.google.com/protocol-buffers/docs/gotutorial)
+
+```
+# generate protobuf code
+protoc --go_out=. --go_opt=paths=source_relative     --go-grpc_out=. --go-grpc_opt=paths=source_relative protobuf/clients.proto 
+```
+
 
 ## Usage
 
