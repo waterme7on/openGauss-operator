@@ -3,19 +3,31 @@ on:
   push:
     branches:
     - master
-  pull_request:
-    branches: 
-    - master
+    - dev
 
 jobs:
-  push_to_registry:
-    name: Push Docker image to Docker Hub
+#   push_to_registry:
+#     name: Push Docker image to Docker Hub
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Check out the repo
+#         uses: actions/checkout@v2
+#       - name: Log in to Docker Hub
+#         uses: docker/login-action@v1
+#         with:
+#           username: ${{ secrets.DOCKER_USERNAME }}
+#           password: ${{ secrets.DOCKER_PASSWORD }}
+
+  build_and_push_container_image:
+    name: build and push image
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+    - uses: actions/checkout@v2 
+    - uses: mr-smithers-excellent/docker-build-push@v5
+      with:
+        image: waterme7on/opengauss-operator
+        registry: docker.io
+        dockerfile: Dockerfile
+        addTimestamp: true
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
