@@ -22,8 +22,14 @@ jobs:
     name: build and push image
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2 
-    - uses: mr-smithers-excellent/docker-build-push@v5
+    - name: checkout
+      uses: actions/checkout@v2 
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
+    - name: Build and push
+      uses: mr-smithers-excellent/docker-build-push@v5
       with:
         image: waterme7on/opengauss-operator
         registry: docker.io
