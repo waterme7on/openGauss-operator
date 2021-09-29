@@ -44,11 +44,12 @@ func NewPersistentVolumeClaim(og *v1.OpenGauss) *corev1.PersistentVolumeClaim {
 			Labels: map[string]string{
 				"app": og.Name,
 			},
+			Namespace: og.Namespace,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			Resources: *og.Spec.Resources,
 			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
+				corev1.ReadWriteMany,
 			},
 		},
 	}
@@ -91,6 +92,7 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res.Spec.Template.Spec.Containers[0].Image = og.Spec.Image
 
 	res.Name = formatter.StatefulSetName()
+	res.Namespace = og.Namespace
 	res.Spec.Selector.MatchLabels["app"] = res.Name
 	res.Spec.Template.ObjectMeta.Labels["app"] = res.Name
 	res.Spec.Template.Spec.Containers[0].Name = res.Name
@@ -145,6 +147,7 @@ func NewConfigMap(id Identity, og *v1.OpenGauss) (*unstructured.Unstructured, sc
 
 	configMapRes := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
 	configMap.SetName(formatter.ConfigMapName())
+	configMap.SetNamespace(og.Namespace)
 	return configMap, configMapRes
 }
 
