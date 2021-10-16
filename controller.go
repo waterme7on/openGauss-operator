@@ -9,11 +9,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	opengaussv1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
-	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
-	ogscheme "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/scheme"
-	informers "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/opengausscontroller/v1"
-	listers "github.com/waterme7on/openGauss-controller/pkg/generated/listers/opengausscontroller/v1"
+	opengaussv1 "github.com/waterme7on/openGauss-operator/pkg/apis/opengausscontroller/v1"
+	clientset "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned"
+	ogscheme "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned/scheme"
+	informers "github.com/waterme7on/openGauss-operator/pkg/generated/informers/externalversions/opengausscontroller/v1"
+	listers "github.com/waterme7on/openGauss-operator/pkg/generated/listers/opengausscontroller/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,7 +34,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const controllerAgentName = "openGauss-controller"
+const controllerAgentName = "openGauss-operator"
 
 const (
 	// SuccessSynced is used as part of the Event 'reason' when a Foo is synced
@@ -305,7 +305,7 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
-	// 2. check if all components are controller by opengauss
+	// 2. check if all components are controlled by opengauss
 	// checked if statefulsets are controlled by this og resource
 	if !v1.IsControlledBy(masterStatefulset, og) {
 		msg := fmt.Sprintf(MessageResourceExists, masterStatefulset.Name)
@@ -440,7 +440,7 @@ func (c *Controller) enqueueOpenGauss(obj interface{}) {
 	c.workqueue.Add(key)
 }
 
-// handdleStatefulsets will take any resource implementing metav1.Object and attempt
+// handdleObjects will take any resource implementing metav1.Object and attempt
 // to find the opengauss resource that owns it.
 // It does this by looking at the objects metadata.ownerReferences field for an appropriate OwnerReference
 // It then enqueues that opengauss resource to be processed.

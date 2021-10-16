@@ -19,8 +19,8 @@ limitations under the License.
 package autoscaler
 
 import (
-	v1 "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/autoscaler/v1"
-	internalinterfaces "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/internalinterfaces"
+	v1 "github.com/waterme7on/openGauss-operator/pkg/generated/informers/externalversions/autoscaler/v1"
+	internalinterfaces "github.com/waterme7on/openGauss-operator/pkg/generated/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.

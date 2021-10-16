@@ -19,8 +19,8 @@ limitations under the License.
 package opengausscontroller
 
 import (
-	internalinterfaces "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/internalinterfaces"
-	v1 "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/opengausscontroller/v1"
+	internalinterfaces "github.com/waterme7on/openGauss-operator/pkg/generated/informers/externalversions/internalinterfaces"
+	v1 "github.com/waterme7on/openGauss-operator/pkg/generated/informers/externalversions/opengausscontroller/v1"
 )
 
 // Interface provides access to each of this group's versions.

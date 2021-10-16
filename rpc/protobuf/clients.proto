@@ -1,6 +1,6 @@
 syntax = "proto3";
 package controllerClient;
-option go_package = "github.com/waterme7on/openGauss-controller/rpc/protobuf";
+option go_package = "github.com/waterme7on/openGauss-operator/rpc/protobuf";
 
 // Interface exported by the server.
 service OpenGaussController {

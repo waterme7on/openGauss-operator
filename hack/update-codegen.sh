@@ -20,24 +20,21 @@ set -o pipefail
 
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
-PACKAGE_ROOT="github.com/waterme7on/openGauss-controller"
-
-echo script root: $SCRIPT_ROOT
-echo codegen pkg: $CODEGEN_PKG
-echo package root: $PACKAGE_ROOT
+PACKAGE_ROOT="github.com/waterme7on/openGauss-operator"
 
 # generate the code with:
 # --output-base    because this script should also be able to run inside the vendor dir of
 #                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
 #                  instead of the $GOPATH directly. For normal projects this can be dropped.
-# generate opengauss controller
 bash "${CODEGEN_PKG}"/generate-groups.sh "deepcopy,client,informer,lister" \
   ${PACKAGE_ROOT}/pkg/generated ${PACKAGE_ROOT}/pkg/apis \
   "opengausscontroller:v1 autoscaler:v1" \
-  --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt \
-  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.."
-  # -o ${PACKAGE_ROOT} # output to pkg/apis deepcopy, default value is pkg/apis/group/version/
-
+  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.." \
+  --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt
 
 # To use your own boilerplate text append:
 #   --go-header-file "${SCRIPT_ROOT}"/hack/custom-boilerplate.go.txt
+#${PKG_PATH}/generated ${PKG_PATH}/apis \
+#k8s.io/sample-controller/pkg/generated k8s.io/sample-controller/pkg/apis \
+#/root/sample-controller/pkg/generated /root/sample-controller/pkg/apis \
+# --output-base "$(dirname "${BASH_SOURCE[0]}")/.." \

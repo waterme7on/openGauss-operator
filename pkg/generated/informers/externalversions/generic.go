@@ -21,8 +21,8 @@ package externalversions
 import (
 	"fmt"
 
-	autoscalerv1 "github.com/waterme7on/openGauss-controller/pkg/apis/autoscaler/v1"
-	v1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
+	autoscalerv1 "github.com/waterme7on/openGauss-operator/pkg/apis/autoscaler/v1"
+	v1 "github.com/waterme7on/openGauss-operator/pkg/apis/opengausscontroller/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )

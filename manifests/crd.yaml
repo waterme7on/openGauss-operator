@@ -143,6 +143,8 @@ spec:
                           memory:
                             type: string
                             pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                  mycat:
+                    type: string
           status:
             type: object
             additionalProperties:

@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	v1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1"
+	v1 "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned/typed/opengausscontroller/v1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )

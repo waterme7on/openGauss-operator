@@ -19,11 +19,11 @@ limitations under the License.
 package fake
 
 import (
-	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
-	scalerv1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/autoscaler/v1"
-	fakescalerv1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/autoscaler/v1/fake"
-	controllerv1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1"
-	fakecontrollerv1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1/fake"
+	clientset "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned"
+	scalerv1 "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned/typed/autoscaler/v1"
+	fakescalerv1 "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned/typed/autoscaler/v1/fake"
+	controllerv1 "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned/typed/opengausscontroller/v1"
+	fakecontrollerv1 "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned/typed/opengausscontroller/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"

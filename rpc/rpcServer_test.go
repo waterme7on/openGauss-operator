@@ -4,7 +4,7 @@ import (
 	"flag"
 	"testing"
 
-	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
+	clientset "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
