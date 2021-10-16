@@ -19,8 +19,8 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
-	"github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/scheme"
+	v1 "github.com/waterme7on/openGauss-operator/pkg/apis/opengausscontroller/v1"
+	"github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )
 

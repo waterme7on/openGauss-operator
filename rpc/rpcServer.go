@@ -9,9 +9,9 @@ import (
 
 	"errors"
 
-	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
-	pb "github.com/waterme7on/openGauss-controller/rpc/protobuf"
-	"github.com/waterme7on/openGauss-controller/util"
+	clientset "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned"
+	pb "github.com/waterme7on/openGauss-operator/rpc/protobuf"
+	"github.com/waterme7on/openGauss-operator/util"
 	grpc "google.golang.org/grpc"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"

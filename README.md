@@ -1,6 +1,6 @@
-# openGauss-controller
+# openGauss-operator
 
-The openGauss-controller uses the [client-go](https://github.com/kubernetes/client-go) library to develop a custom controller monitoring, scheduling and updating openGauss cluster in kubernetes.
+The openGauss-operator uses the [client-go](https://github.com/kubernetes/client-go) library to develop a custom controller monitoring, scheduling and updating openGauss cluster in kubernetes.
 
 ### Table of Content
 
@@ -20,8 +20,8 @@ Follow [kube-prometheus quick start](https://github.com/prometheus-operator/kube
 
 Fetch the project
 ```sh
-git clone https://github.com/waterme7on/openGauss-controller.git
-cd openGauss-controller
+git clone https://github.com/waterme7on/openGauss-operator.git
+cd openGauss-operator
 ```
 
 Build and Run in Process

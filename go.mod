@@ -1,4 +1,4 @@
-module github.com/waterme7on/openGauss-controller
+module github.com/waterme7on/openGauss-operator
 
 go 1.16
 

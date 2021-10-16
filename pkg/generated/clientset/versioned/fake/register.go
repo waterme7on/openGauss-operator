@@ -19,8 +19,8 @@ limitations under the License.
 package fake
 
 import (
-	scalerv1 "github.com/waterme7on/openGauss-controller/pkg/apis/autoscaler/v1"
-	controllerv1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
+	scalerv1 "github.com/waterme7on/openGauss-operator/pkg/apis/autoscaler/v1"
+	controllerv1 "github.com/waterme7on/openGauss-operator/pkg/apis/opengausscontroller/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

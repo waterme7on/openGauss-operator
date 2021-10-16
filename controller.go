@@ -9,11 +9,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	opengaussv1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
-	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
-	ogscheme "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/scheme"
-	informers "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions/opengausscontroller/v1"
-	listers "github.com/waterme7on/openGauss-controller/pkg/generated/listers/opengausscontroller/v1"
+	opengaussv1 "github.com/waterme7on/openGauss-operator/pkg/apis/opengausscontroller/v1"
+	clientset "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned"
+	ogscheme "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned/scheme"
+	informers "github.com/waterme7on/openGauss-operator/pkg/generated/informers/externalversions/opengausscontroller/v1"
+	listers "github.com/waterme7on/openGauss-operator/pkg/generated/listers/opengausscontroller/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,7 +34,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const controllerAgentName = "openGauss-controller"
+const controllerAgentName = "openGauss-operator"
 
 const (
 	// SuccessSynced is used as part of the Event 'reason' when a Foo is synced

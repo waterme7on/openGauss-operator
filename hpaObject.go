@@ -4,12 +4,12 @@ This files implements helpful utils to manage components of openGauss.
 package main
 
 import (
-	v1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
-	"github.com/waterme7on/openGauss-controller/util"
+	v1 "github.com/waterme7on/openGauss-operator/pkg/apis/opengausscontroller/v1"
+	"github.com/waterme7on/openGauss-operator/util"
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	scalerv1 "github.com/waterme7on/openGauss-controller/pkg/apis/autoscaler/v1"
+	scalerv1 "github.com/waterme7on/openGauss-operator/pkg/apis/autoscaler/v1"
 )
 
 func NewHorizontalPodAutoscaler(og *v1.OpenGauss, autoscaler *scalerv1.AutoScaler, id Identity) *autoscaling.HorizontalPodAutoscaler {
