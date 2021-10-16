@@ -21,8 +21,8 @@ package versioned
 import (
 	"fmt"
 
-	scalerv1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/autoscaler/v1"
-	controllerv1 "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned/typed/opengausscontroller/v1"
+	scalerv1 "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned/typed/autoscaler/v1"
+	controllerv1 "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned/typed/opengausscontroller/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"

@@ -26,9 +26,9 @@ import (
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
-	clientset "github.com/waterme7on/openGauss-controller/pkg/generated/clientset/versioned"
-	informers "github.com/waterme7on/openGauss-controller/pkg/generated/informers/externalversions"
-	"github.com/waterme7on/openGauss-controller/pkg/signals"
+	clientset "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned"
+	informers "github.com/waterme7on/openGauss-operator/pkg/generated/informers/externalversions"
+	"github.com/waterme7on/openGauss-operator/pkg/signals"
 )
 
 var (

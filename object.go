@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	v1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
-	"github.com/waterme7on/openGauss-controller/util"
+	v1 "github.com/waterme7on/openGauss-operator/pkg/apis/opengausscontroller/v1"
+	"github.com/waterme7on/openGauss-operator/util"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

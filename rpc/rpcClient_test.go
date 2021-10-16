@@ -6,7 +6,7 @@ import (
 	"log"
 	"testing"
 
-	pb "github.com/waterme7on/openGauss-controller/rpc/protobuf"
+	pb "github.com/waterme7on/openGauss-operator/rpc/protobuf"
 	grpc "google.golang.org/grpc"
 )
 

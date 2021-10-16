@@ -1,11 +1,12 @@
 /*
-	this file defines formatter for names and attributes used in OpenGauss-controller
+	this file defines formatter for names and attributes used in openGauss-operator
 */
 package util
 
 import (
 	"fmt"
-	v1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
+
+	v1 "github.com/waterme7on/openGauss-operator/pkg/apis/opengausscontroller/v1"
 )
 
 type PersistentVolumeClaimFormatterInterface interface {

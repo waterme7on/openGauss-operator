@@ -21,7 +21,7 @@ package fake
 import (
 	"context"
 
-	opengausscontrollerv1 "github.com/waterme7on/openGauss-controller/pkg/apis/opengausscontroller/v1"
+	opengausscontrollerv1 "github.com/waterme7on/openGauss-operator/pkg/apis/opengausscontroller/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

@@ -24,5 +24,5 @@ Then you will see outputs like
 ```
 2021/09/04 00:07:44 success:true
 PASS
-ok      github.com/waterme7on/openGauss-controller/rpc  0.056s
+ok      github.com/waterme7on/openGauss-operator/rpc  0.056s
 ```
