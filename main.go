@@ -29,6 +29,7 @@ import (
 	clientset "github.com/waterme7on/openGauss-operator/pkg/generated/clientset/versioned"
 	informers "github.com/waterme7on/openGauss-operator/pkg/generated/informers/externalversions"
 	"github.com/waterme7on/openGauss-operator/pkg/signals"
+	"github.com/waterme7on/openGauss-operator/rpc"
 )
 
 var (
@@ -78,9 +79,16 @@ func main() {
 	kubeInformerFactory.Start(stopCh)
 	opengaussInformerFactory.Start(stopCh)
 
+	// run rpc server
+	klog.Info("Run rpc server")
+	s := rpc.NewRpcServer(openGaussClient)
+	go s.Run()
+
+	klog.Info("Run controller worker")
 	if err = controller.Run(2, stopCh); err != nil {
 		klog.Fatalf("Error running controller: %s", err.Error())
 	}
+
 }
 
 func init() {
