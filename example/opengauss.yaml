@@ -15,6 +15,7 @@ spec:
       replicas: 1
     worker:
       replicas: 0
-    mycat:
+    mycat: nginx
+      
       
     

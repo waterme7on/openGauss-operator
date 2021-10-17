@@ -68,6 +68,7 @@ func main() {
 	opengaussInformerFactory := informers.NewSharedInformerFactory(openGaussClient, time.Second*30)
 
 	controller := NewController(kubeClient, openGaussClient, dynamicClient,
+		kubeInformerFactory.Apps().V1().Deployments(),
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().Services(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),
