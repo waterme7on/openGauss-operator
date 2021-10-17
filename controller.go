@@ -396,7 +396,7 @@ func (c *Controller) updateOpenGaussStatus(
 	og *opengaussv1.OpenGauss,
 	masterStatefulset *appsv1.StatefulSet,
 	replicasStatefulset *appsv1.StatefulSet,
-	deployment *appsv1.Deployment,
+	mycatDeployment *appsv1.Deployment,
 	pvc *corev1.PersistentVolumeClaim) error {
 	var err error
 	ogCopy := og.DeepCopy()
@@ -407,11 +407,11 @@ func (c *Controller) updateOpenGaussStatus(
 	ogCopy.Status.ReplicasStatefulset = replicasStatefulset.Name
 	ogCopy.Status.ReadyMaster = (strconv.Itoa(int(masterStatefulset.Status.ReadyReplicas)))
 	ogCopy.Status.ReadyReplicas = (strconv.Itoa(int(replicasStatefulset.Status.ReadyReplicas)))
-	ogCopy.Status.ReadyMycat = (strconv.Itoa(int(deployment.Status.ReadyReplicas)))
+	ogCopy.Status.ReadyMycat = (strconv.Itoa(int(mycatDeployment.Status.ReadyReplicas)))
 	ogCopy.Status.PersistentVolumeClaimName = pvc.Name
 	if (masterStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Master.Replicas &&
 	(replicasStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Worker.Replicas &&
-	deployment.Status.ReadyReplicas == 1{
+	mycatDeployment.Status.ReadyReplicas == *ogCopy.Spec.OpenGauss.Mycat.Replicas{
 		ogCopy.Status.OpenGaussStatus = "READY"
 	}
 	ogCopy, err = c.openGaussClientset.ControllerV1().OpenGausses(ogCopy.Namespace).UpdateStatus(context.TODO(), ogCopy, v1.UpdateOptions{})
