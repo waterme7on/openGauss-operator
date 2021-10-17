@@ -101,8 +101,8 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 }
 
 // NewDeployment return mycat deployment object 
-func NewDeployment(og *v1.OpenGauss) (res *appsv1.Deployment) {
-	res = deploymentTemplate(og)
+func NewMycatDeployment(og *v1.OpenGauss) (res *appsv1.Deployment) {
+	res = MycatDeploymentTemplate(og)
 
 	return
 }
@@ -373,9 +373,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 }
 
 // deploymentTemplate returns a deployment of mycat
-func deploymentTemplate(og *v1.OpenGauss) *appsv1.Deployment {
-	var repNum int32
-	repNum = 1
+func MycatDeploymentTemplate(og *v1.OpenGauss) *appsv1.Deployment {
 	labels := map[string]string{
 		"app":        "nginx",
 		"controller": og.Name,
@@ -390,7 +388,7 @@ func deploymentTemplate(og *v1.OpenGauss) *appsv1.Deployment {
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &repNum,
+			Replicas: og.Spec.OpenGauss.Mycat.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -401,8 +399,8 @@ func deploymentTemplate(og *v1.OpenGauss) *appsv1.Deployment {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "nginx",
-							Image: "nginx:latest",
+							Name:  "mycat",
+							Image: og.Spec.OpenGauss.Mycat.Image,
 						},
 					},
 				},

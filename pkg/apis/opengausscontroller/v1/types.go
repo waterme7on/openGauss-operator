@@ -30,11 +30,17 @@ type OpenGaussSpec struct {
 type OpenGaussClusterConfiguration struct {
 	Master *OpenGaussStatefulSet `json:"master"` // Master Configuration
 	Worker *OpenGaussStatefulSet `json:"worker"` // Replicas Configuration
+	Mycat  *MycatDeployment		 `json:"mycat"`  // Mycat Configuration
 }
 
 type OpenGaussStatefulSet struct {
 	Replicas  *int32                       `json:"replicas"`
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type MycatDeployment struct {
+	Image		string `json:"image"`
+	Replicas	*int32 `json:"replicas"`
 }
 
 // OpenGauss Cluster's status

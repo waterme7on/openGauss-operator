@@ -321,8 +321,9 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	// create or get mycat deployment
-	deployConfig := NewDeployment(og)
-	deployment, err := c.createOrGetDeployment(og.Namespace, deployConfig)
+	mycatDeployConfig := NewMycatDeployment(og)
+	mycatDeployment, err := c.createOrGetDeployment(og.Namespace, mycatDeployConfig)
+	
 	if err != nil {
 		return err
 	}
@@ -339,8 +340,8 @@ func (c *Controller) syncHandler(key string) error {
 		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
 		return fmt.Errorf(msg)
 	}
-	if !v1.IsControlledBy(deployment, og) {
-		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
+	if !v1.IsControlledBy(mycatDeployment, og) {
+		msg := fmt.Sprintf(MessageResourceExists, mycatDeployment.Name)
 		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
 		return fmt.Errorf(msg)
 	}
@@ -348,8 +349,7 @@ func (c *Controller) syncHandler(key string) error {
 	// 3. check if the status of all components satisfy
 	// checked if replicas number are correct
 	if *og.Spec.OpenGauss.Master.Replicas != (*masterStatefulset.Spec.Replicas) ||
-		*og.Spec.OpenGauss.Worker.Replicas != (*replicasStatefulset.Spec.Replicas) ||
-		*deployment.Spec.Replicas != 1{
+		*og.Spec.OpenGauss.Worker.Replicas != (*replicasStatefulset.Spec.Replicas) {
 		// update configmap
 		masterConfigMap, masterConfigMapRes := NewMasterConfigMap(og)
 		err = c.createOrUpdateConfigMap(og.Namespace, masterConfigMap, masterConfigMapRes)
@@ -364,20 +364,24 @@ func (c *Controller) syncHandler(key string) error {
 	// checked if persistent volume claims are correct
 	if *og.Spec.Resources.Requests.Storage() != *pvc.Spec.Resources.Requests.Storage() {
 		klog.V(4).Infof("Update OpenGauss pvc storage")
-		// pv, err := c.kubeClientset.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, v1.GetOptions{})
-		// if err != nil {
-		// 	return err
-		// }
-		// pv.Spec.Capacity = og.Spec.Resources.Requests
-		// pv, err = c.kubeClientset.CoreV1().PersistentVolumes().Update(context.TODO(), pv, v1.UpdateOptions{})
 		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Update(context.TODO(), NewPersistentVolumeClaim(og), v1.UpdateOptions{})
 	}
 	if err != nil {
 		return err
 	}
 
+	// check if mycat deployment is correct
+	
+	if *og.Spec.OpenGauss.Mycat.Replicas != *mycatDeployment.Spec.Replicas {
+		klog.V(4).Infof("Openguass %s mycat deployments, expected replicas: %d, actual replicas: %d", og.Name, *og.Spec.OpenGauss.Mycat.Replicas, *mycatDeployment.Spec.Replicas)
+		mycatDeployment, err = c.kubeClientset.AppsV1().Deployments(og.Namespace).Update(context.TODO(), NewMycatDeployment(og), v1.UpdateOptions{})
+	}
+	if err != nil {
+		return err
+	}
+
 	// finally update opengauss resource status
-	err = c.updateOpenGaussStatus(og, masterStatefulset, replicasStatefulset, deployment, pvc)
+	err = c.updateOpenGaussStatus(og, masterStatefulset, replicasStatefulset, mycatDeployment, pvc)
 	if err != nil {
 		return err
 	}
