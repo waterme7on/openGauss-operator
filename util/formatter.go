@@ -5,7 +5,6 @@ package util
 
 import (
 	"fmt"
-
 	v1 "github.com/waterme7on/openGauss-operator/pkg/apis/opengausscontroller/v1"
 )
 

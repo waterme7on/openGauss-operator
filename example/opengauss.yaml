@@ -2,15 +2,22 @@ apiVersion: "controller.k8s.do/v1"
 kind: OpenGauss
 metadata:
   name: test-opengauss
+  namespace: test
 spec:
-  image: opengauss:debug
+  image: waterme7on/opengauss:debug
   imagePullPolicy: IfNotPresent
   resources:
     requests:
-      storage: 500Mi
-  storageClassName: "opengauss-csi"
+      storage: 2Gi
+  # storageClassName: "rook-cephfs"
   opengauss:
     master:
       replicas: 1
     worker:
       replicas: 0
+    mycat:
+      image: "nginx:latest"
+      replicas: 1
+      
+      
+    

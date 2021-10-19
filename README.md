@@ -16,6 +16,16 @@ Use prometheus to monitor the pod and node status.
 
 Follow [kube-prometheus quick start](https://github.com/prometheus-operator/kube-prometheus#quickstart) to install prometheus stack.
 
+### Generate code
+Before generating code, make sure your project is in a directory with path `xxx/github.com/waterme7on/`.
+
+Fetch code-generator repo and execute script.
+
+```sh
+go mod vendor
+./hack/update-codegen.sh
+```
+
 ### Deploy OpenGauss controller
 
 Fetch the project
@@ -51,7 +61,7 @@ Check status
 
 ```sh
 # check all the components of opengauss defined by example
-kubect get all | grep opengauss
+kubectl get all | grep opengauss
 ```
 
 

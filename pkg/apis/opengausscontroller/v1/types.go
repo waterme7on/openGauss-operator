@@ -30,6 +30,7 @@ type OpenGaussSpec struct {
 type OpenGaussClusterConfiguration struct {
 	Master *OpenGaussStatefulSet `json:"master"` // Master Configuration
 	Worker *OpenGaussStatefulSet `json:"worker"` // Replicas Configuration
+	Mycat  *MycatDeployment		 `json:"mycat"`  // Mycat Configuration
 }
 
 type OpenGaussStatefulSet struct {
@@ -37,11 +38,17 @@ type OpenGaussStatefulSet struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
+type MycatDeployment struct {
+	Image		string `json:"image"`
+	Replicas	*int32 `json:"replicas"`
+}
+
 // OpenGauss Cluster's status
 type OpenGaussStatus struct {
 	OpenGaussStatus           string `json:"opengaussStatus"`                     // OpenGauss if ready or not
 	ReadyMaster               string `json:"readyMaster,omitempty"`               // Ready Master number
 	ReadyReplicas             string `json:"readyReplicas,omitempty"`             // Ready Replicas number
+	ReadyMycat				  string `json:"readyMycat,omitempty"`
 	MasterStatefulset         string `json:"masterStatefulset,omitempty"`         // name of master statefulset
 	ReplicasStatefulset       string `json:"replicasStatefulset,omitempty"`       // name of replicas statefulset
 	PersistentVolumeClaimName string `json:"persistentVolumeClaimName,omitempty"` // name of pvc
