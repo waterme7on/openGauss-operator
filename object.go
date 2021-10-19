@@ -102,7 +102,7 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 
 // NewDeployment return mycat deployment object 
 func NewMycatDeployment(og *v1.OpenGauss) (res *appsv1.Deployment) {
-	res = MycatDeploymentTemplate(og)
+	res = DeploymentTemplate(og)
 
 	return
 }
@@ -373,7 +373,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 }
 
 // deploymentTemplate returns a deployment of mycat
-func MycatDeploymentTemplate(og *v1.OpenGauss) *appsv1.Deployment {
+func DeploymentTemplate(og *v1.OpenGauss) *appsv1.Deployment {
 	labels := map[string]string{
 		"app":        "nginx",
 		"controller": og.Name,
