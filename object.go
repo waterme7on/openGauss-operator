@@ -80,12 +80,10 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	case Master:
 		formatter = util.Master(og)
 		res.Spec.Replicas = util.Int32Ptr(*og.Spec.OpenGauss.Master.Replicas)
-		break
 	case Replicas:
 		formatter = util.Replica(og)
 		res.Spec.Replicas = util.Int32Ptr(*og.Spec.OpenGauss.Worker.Replicas)
 		res.Spec.Template.Spec.Containers[0].Args[1] = "standby"
-		break
 	default:
 		return
 	}
@@ -104,6 +102,12 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	return
 }
 
+// NewDeployment return mycat deployment object 
+func NewMycatDeployment(og *v1.OpenGauss) (res *appsv1.Deployment) {
+	res = DeploymentTemplate(og)
+
+	return
+}
 type configmap struct {
 	ApiVersion string            `json:"apiVersion"`
 	Data       map[string]string `json:"data"`
@@ -395,6 +399,43 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 		},
 	}
 	return template
+}
+
+// deploymentTemplate returns a deployment of mycat
+func DeploymentTemplate(og *v1.OpenGauss) *appsv1.Deployment {
+	labels := map[string]string{
+		"app":        "nginx",
+		"controller": og.Name,
+	}
+
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "openguass-mycat-deployment",
+			Namespace: og.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGuass")),
+			},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: og.Spec.OpenGauss.Mycat.Replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "mycat",
+							Image: og.Spec.OpenGauss.Mycat.Image,
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 // load configmap file from /config/config.yaml

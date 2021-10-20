@@ -8,8 +8,8 @@ import (
 	"strconv"
 
 	"github.com/prometheus/common/model"
-	pb "github.com/waterme7on/openGauss-controller/rpc/protobuf"
-	"github.com/waterme7on/openGauss-controller/util/prometheusUtil"
+	pb "github.com/waterme7on/openGauss-operator/rpc/protobuf"
+	"github.com/waterme7on/openGauss-operator/util/prometheusUtil"
 	"google.golang.org/grpc"
 )
 
@@ -20,7 +20,8 @@ var (
 func main() {
 	// skeleton code
 	// 连接prometheus Client
-	address := "http://10.77.50.201:30364"
+	// address := "http://10.77.50.201:30364"
+	address := "http://10.77.50.201:31111"
 	_, queryClient, err := prometheusUtil.GetPrometheusClient(address)
 	if err != nil {
 		log.Fatalf("Cannot connect to prometheus: %s, %s", address, err.Error())
@@ -38,10 +39,9 @@ func main() {
 	defer conn.Close()
 	// 建立客户端
 	client := pb.NewOpenGaussControllerClient(conn)
-
 	// TODO:
 	// 查询: util/prometheusUtil/prometheusQuerys.go
-	result, err := prometheusUtil.QueryPodCpuUsagePercentage("prometheus", queryClient)
+	result, err := prometheusUtil.QueryPodCpuUsagePercentage("test-opengauss", queryClient)
 	if err != nil {
 		log.Fatalf("Cannot query prometheus: %s, %s", address, err.Error())
 	}
@@ -52,12 +52,28 @@ func main() {
 	// key: {pod="prometheus-6d75d99cb9-lx8w2"}
 	// value: 4.93641914680743
 	// 均为string
-
+	for k, v := range m {
+		fmt.Println(k)
+		fmt.Println(v)
+	}
+	if percentage, _ := strconv.ParseFloat(m["{pod=\"prometheus-operator-75d9b475d9-955fv\"}"], 64); percentage > 0 {
+		fmt.Println("test scale out")
+		request := &pb.ScaleRequest{
+			OpenGaussObjectKey: "test/test-opengauss",
+			MasterReplication:  1,
+			WorkerReplication:  2,
+		}
+		response, err := client.Scale(context.TODO(), request)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Print(response)
+	}
 	if percentage, _ := strconv.ParseFloat(m["xxx"], 64); percentage > 50 {
 		// 示例如果cpu利用率大于50，则发起Scale调用
 		// 发起rpc调用
 		request := &pb.ScaleRequest{
-			OpenGaussObjectKey: "default/test-opengauss",
+			OpenGaussObjectKey: "test/test-opengauss",
 			MasterReplication:  1,
 		}
 		response, err := client.Scale(context.TODO(), request)

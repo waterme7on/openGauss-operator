@@ -64,6 +64,8 @@ type Controller struct {
 	// thus needing listers of according resources
 	openGaussLister   listers.OpenGaussLister
 	openGaussSynced   cache.InformerSynced
+	deploymentLister  appslisters.DeploymentLister
+	deploymentSynced  cache.InformerSynced
 	statefulsetLister appslisters.StatefulSetLister
 	statefulsetSynced cache.InformerSynced
 	serviceLister     corelisters.ServiceLister
@@ -87,6 +89,7 @@ func NewController(
 	kubeclientset kubernetes.Interface,
 	openGaussClientset clientset.Interface,
 	dynamicClient dynamic.Interface,
+	deploymentInformer appsinformers.DeploymentInformer,
 	statefulsetInformer appsinformers.StatefulSetInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	configmapInformer coreinformers.ConfigMapInformer,
@@ -111,6 +114,8 @@ func NewController(
 		openGaussClientset: openGaussClientset,
 		openGaussLister:    openGaussInformer.Lister(),
 		openGaussSynced:    openGaussInformer.Informer().HasSynced,
+		deploymentLister: 	deploymentInformer.Lister(),
+		deploymentSynced: 	deploymentInformer.Informer().HasSynced,
 		statefulsetLister:  statefulsetInformer.Lister(),
 		statefulsetSynced:  statefulsetInformer.Informer().HasSynced,
 		serviceLister:      serviceInformer.Lister(),
@@ -128,6 +133,21 @@ func NewController(
 		UpdateFunc: func(old, new interface{}) {
 			controller.enqueueOpenGauss(new)
 		},
+	})
+
+	deploymentInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.handleObjects,
+		UpdateFunc: func(old, new interface{}) {
+			newDepl := new.(*appsv1.Deployment)
+			oldDepl := old.(*appsv1.Deployment)
+			if newDepl.ResourceVersion == oldDepl.ResourceVersion {
+				// Periodic resync will send update events for all known Deployments.
+				// Two different versions of the same Deployment will always have different RVs.
+				return
+			}
+			controller.handleObjects(new)
+		},
+		DeleteFunc: controller.handleObjects,
 	})
 
 	statefulsetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -158,7 +178,7 @@ func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
 
 	// wait for the caches to be synced before starting workers
 	klog.Infoln("Syncing informers' caches")
-	if ok := cache.WaitForCacheSync(stopCh, c.statefulsetSynced, c.serviceSynced, c.configMapSynced, c.openGaussSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, c.deploymentSynced, c.statefulsetSynced, c.serviceSynced, c.configMapSynced, c.openGaussSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
@@ -254,6 +274,7 @@ func (c *Controller) syncHandler(key string) error {
 	}
 	klog.Info("Syncing status of OpenGauss ", og.Name)
 
+	// 第一阶段不同于sample-controller，在object.go中新定义的函数可以创建或者获得
 	// 1. check if all components are deployed, includes service, configmap, master and worker statefulsets
 	// create or get pvc
 	var pvc *corev1.PersistentVolumeClaim
@@ -299,13 +320,21 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
+  // create mycat configmap
 	mycatConfigMap := NewMyCatConfigMap(og)
 	err = c.createOrUpdateConfigMap(og.Namespace, mycatConfigMap, relicaConfigMapRes)
+  if err != nil {
+		return err
+	}
+  
+	// create or get mycat deployment
+	mycatDeployConfig := NewMycatDeployment(og)
+	mycatDeployment, err := c.createOrGetDeployment(og.Namespace, mycatDeployConfig)
 	if err != nil {
 		return err
 	}
 
-	// 2. check if all components are controller by opengauss
+	// 2. check if all components are controlled by opengauss
 	// checked if statefulsets are controlled by this og resource
 	if !v1.IsControlledBy(masterStatefulset, og) {
 		msg := fmt.Sprintf(MessageResourceExists, masterStatefulset.Name)
@@ -317,10 +346,16 @@ func (c *Controller) syncHandler(key string) error {
 		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
 		return fmt.Errorf(msg)
 	}
+	if !v1.IsControlledBy(mycatDeployment, og) {
+		msg := fmt.Sprintf(MessageResourceExists, mycatDeployment.Name)
+		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
+		return fmt.Errorf(msg)
+	}
 
 	// 3. check if the status of all components satisfy
 	// checked if replicas number are correct
-	if *og.Spec.OpenGauss.Master.Replicas != (*masterStatefulset.Spec.Replicas) || *og.Spec.OpenGauss.Worker.Replicas != (*replicasStatefulset.Spec.Replicas) {
+	if *og.Spec.OpenGauss.Master.Replicas != (*masterStatefulset.Spec.Replicas) ||
+		*og.Spec.OpenGauss.Worker.Replicas != (*replicasStatefulset.Spec.Replicas) {
 		// update configmap
 		masterConfigMap, masterConfigMapRes := NewMasterConfigMap(og)
 		err = c.createOrUpdateDynamicConfigMap(og.Namespace, masterConfigMap, masterConfigMapRes)
@@ -335,20 +370,24 @@ func (c *Controller) syncHandler(key string) error {
 	// checked if persistent volume claims are correct
 	if *og.Spec.Resources.Requests.Storage() != *pvc.Spec.Resources.Requests.Storage() {
 		klog.V(4).Infof("Update OpenGauss pvc storage")
-		// pv, err := c.kubeClientset.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, v1.GetOptions{})
-		// if err != nil {
-		// 	return err
-		// }
-		// pv.Spec.Capacity = og.Spec.Resources.Requests
-		// pv, err = c.kubeClientset.CoreV1().PersistentVolumes().Update(context.TODO(), pv, v1.UpdateOptions{})
 		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Update(context.TODO(), NewPersistentVolumeClaim(og), v1.UpdateOptions{})
 	}
 	if err != nil {
 		return err
 	}
 
+	// check if mycat deployment is correct
+	
+	if *og.Spec.OpenGauss.Mycat.Replicas != *mycatDeployment.Spec.Replicas {
+		klog.V(4).Infof("Openguass %s mycat deployments, expected replicas: %d, actual replicas: %d", og.Name, *og.Spec.OpenGauss.Mycat.Replicas, *mycatDeployment.Spec.Replicas)
+		mycatDeployment, err = c.kubeClientset.AppsV1().Deployments(og.Namespace).Update(context.TODO(), NewMycatDeployment(og), v1.UpdateOptions{})
+	}
+	if err != nil {
+		return err
+	}
+
 	// finally update opengauss resource status
-	err = c.updateOpenGaussStatus(og, masterStatefulset, replicasStatefulset, pvc)
+	err = c.updateOpenGaussStatus(og, masterStatefulset, replicasStatefulset, mycatDeployment, pvc)
 	if err != nil {
 		return err
 	}
@@ -363,6 +402,7 @@ func (c *Controller) updateOpenGaussStatus(
 	og *opengaussv1.OpenGauss,
 	masterStatefulset *appsv1.StatefulSet,
 	replicasStatefulset *appsv1.StatefulSet,
+	mycatDeployment *appsv1.Deployment,
 	pvc *corev1.PersistentVolumeClaim) error {
 	var err error
 	ogCopy := og.DeepCopy()
@@ -373,8 +413,11 @@ func (c *Controller) updateOpenGaussStatus(
 	ogCopy.Status.ReplicasStatefulset = replicasStatefulset.Name
 	ogCopy.Status.ReadyMaster = (strconv.Itoa(int(masterStatefulset.Status.ReadyReplicas)))
 	ogCopy.Status.ReadyReplicas = (strconv.Itoa(int(replicasStatefulset.Status.ReadyReplicas)))
+	ogCopy.Status.ReadyMycat = (strconv.Itoa(int(mycatDeployment.Status.ReadyReplicas)))
 	ogCopy.Status.PersistentVolumeClaimName = pvc.Name
-	if (masterStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Master.Replicas && (replicasStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Worker.Replicas {
+	if (masterStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Master.Replicas &&
+	(replicasStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Worker.Replicas &&
+	mycatDeployment.Status.ReadyReplicas == *ogCopy.Spec.OpenGauss.Mycat.Replicas{
 		ogCopy.Status.OpenGaussStatus = "READY"
 	}
 	ogCopy, err = c.openGaussClientset.ControllerV1().OpenGausses(ogCopy.Namespace).UpdateStatus(context.TODO(), ogCopy, v1.UpdateOptions{})
@@ -406,6 +449,22 @@ func (c *Controller) createOrGetStatefulset(ns string, config *appsv1.StatefulSe
 		// (try to) create pvc
 		klog.V(4).Infoln("try to create statefulset for opengauss:", config.Name)
 		sts, err = c.kubeClientset.AppsV1().StatefulSets(ns).Create(context.TODO(), config, v1.CreateOptions{})
+	}
+	if err != nil {
+		klog.V(4).Infoln(config.Spec)
+	}
+	return
+}
+
+
+// createOrGetDeployment creates or get deployment of mycat
+func (c *Controller) createOrGetDeployment(ns string, config *appsv1.Deployment) (deployment *appsv1.Deployment, err error){
+	// get deployment
+	klog.V(4).Infoln("try to get deployment for opengauss:", config.Name)
+	deployment, err = c.deploymentLister.Deployments(ns).Get(config.Name)
+	if err != nil {
+		klog.V(4).Infoln("try to create deployment for opengauss:", config.Name)
+		deployment, err = c.kubeClientset.AppsV1().Deployments(ns).Create(context.TODO(), config, v1.CreateOptions{})
 	}
 	if err != nil {
 		klog.V(4).Infoln(config.Spec)
@@ -454,7 +513,7 @@ func (c *Controller) enqueueOpenGauss(obj interface{}) {
 	c.workqueue.Add(key)
 }
 
-// handdleStatefulsets will take any resource implementing metav1.Object and attempt
+// handdleObjects will take any resource implementing metav1.Object and attempt
 // to find the opengauss resource that owns it.
 // It does this by looking at the objects metadata.ownerReferences field for an appropriate OwnerReference
 // It then enqueues that opengauss resource to be processed.
