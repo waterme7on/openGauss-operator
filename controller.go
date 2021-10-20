@@ -286,7 +286,7 @@ func (c *Controller) syncHandler(key string) error {
 
 	// create or update master configmap
 	masterConfigMap, masterConfigMapRes := NewMasterConfigMap(og)
-	err = c.createOrUpdateConfigMap(og.Namespace, masterConfigMap, masterConfigMapRes)
+	err = c.createOrUpdateDynamicConfigMap(og.Namespace, masterConfigMap, masterConfigMapRes)
 	if err != nil {
 		return err
 	}
@@ -304,7 +304,7 @@ func (c *Controller) syncHandler(key string) error {
 
 	// create or update replica configmap
 	replicaConfigMap, relicaConfigMapRes := NewReplicaConfigMap(og)
-	err = c.createOrUpdateConfigMap(og.Namespace, replicaConfigMap, relicaConfigMapRes)
+	err = c.createOrUpdateDynamicConfigMap(og.Namespace, replicaConfigMap, relicaConfigMapRes)
 	if err != nil {
 		return err
 	}
@@ -320,10 +320,16 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
+        // create mycat configmap
+	mycatConfigMap := NewMyCatConfigMap(og)
+	err = c.createOrUpdateConfigMap(og.Namespace, mycatConfigMap, relicaConfigMapRes)
+        if err != nil {
+		return err
+	}
+  
 	// create or get mycat deployment
 	mycatDeployConfig := NewMycatDeployment(og)
 	mycatDeployment, err := c.createOrGetDeployment(og.Namespace, mycatDeployConfig)
-	
 	if err != nil {
 		return err
 	}
@@ -352,9 +358,9 @@ func (c *Controller) syncHandler(key string) error {
 		*og.Spec.OpenGauss.Worker.Replicas != (*replicasStatefulset.Spec.Replicas) {
 		// update configmap
 		masterConfigMap, masterConfigMapRes := NewMasterConfigMap(og)
-		err = c.createOrUpdateConfigMap(og.Namespace, masterConfigMap, masterConfigMapRes)
+		err = c.createOrUpdateDynamicConfigMap(og.Namespace, masterConfigMap, masterConfigMapRes)
 		replicaConfigMap, replicaConfigMapRes := NewReplicaConfigMap(og)
-		err = c.createOrUpdateConfigMap(og.Namespace, replicaConfigMap, replicaConfigMapRes)
+		err = c.createOrUpdateDynamicConfigMap(og.Namespace, replicaConfigMap, replicaConfigMapRes)
 		// update statefulset
 		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, *og.Spec.OpenGauss.Master.Replicas, *masterStatefulset.Spec.Replicas)
 		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewMasterStatefulsets(og), v1.UpdateOptions{})
@@ -450,6 +456,7 @@ func (c *Controller) createOrGetStatefulset(ns string, config *appsv1.StatefulSe
 	return
 }
 
+
 // createOrGetDeployment creates or get deployment of mycat
 func (c *Controller) createOrGetDeployment(ns string, config *appsv1.Deployment) (deployment *appsv1.Deployment, err error){
 	// get deployment
@@ -465,13 +472,27 @@ func (c *Controller) createOrGetDeployment(ns string, config *appsv1.Deployment)
 	return
 }
 
-// createOrUpdateConfigMap creates or update configmap for opengauss
-func (c *Controller) createOrUpdateConfigMap(ns string, cm *unstructured.Unstructured, cmRes schema.GroupVersionResource) error {
+// createOrUpdateDynamicConfigMap creates or update configmap for opengauss
+func (c *Controller) createOrUpdateDynamicConfigMap(ns string, cm *unstructured.Unstructured, cmRes schema.GroupVersionResource) error {
 	klog.V(4).Infoln("try to create configmap:", cm.GetName())
 	_, err := c.dynamicClient.Resource(cmRes).Namespace(ns).Create(context.TODO(), cm, v1.CreateOptions{})
 	if err != nil {
 		klog.V(4).Infoln("failed to create, try to update configmap:", cm.GetName())
 		_, err = c.dynamicClient.Resource(cmRes).Namespace(ns).Update(context.TODO(), cm, v1.UpdateOptions{})
+	}
+	if err != nil {
+		klog.Infoln("failed to create or update configmap:", cm.GetName())
+	}
+	return err
+}
+
+// createOrUpdateConfigMap creates or update configmap for opengauss
+func (c *Controller) createOrUpdateConfigMap(ns string, cm *corev1.ConfigMap, cmRes schema.GroupVersionResource) error {
+	klog.V(4).Infoln("try to create configmap:", cm.GetName())
+	_, err := c.kubeClientset.CoreV1().ConfigMaps(ns).Create(context.TODO(), cm, v1.CreateOptions{})
+	if err != nil {
+		klog.V(4).Infoln("failed to create, try to update configmap:", cm.GetName())
+		_, err = c.kubeClientset.CoreV1().ConfigMaps(ns).Update(context.TODO(), cm, v1.UpdateOptions{})
 	}
 	if err != nil {
 		klog.Infoln("failed to create or update configmap:", cm.GetName())

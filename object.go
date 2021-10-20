@@ -33,7 +33,7 @@ const (
 
 // NewPersistentVolumeCLaim returns pvc according to og's configuration
 func NewPersistentVolumeClaim(og *v1.OpenGauss) *corev1.PersistentVolumeClaim {
-	formatter := util.PersistentVolumeClaimFormatter(og)
+	formatter := util.OpenGaussClusterFormatter(og)
 	pvc := &corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
@@ -97,7 +97,7 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res.Spec.Template.Spec.Containers[0].Env[0].Value = formatter.ReplConnInfo()
 	res.Spec.Template.Spec.InitContainers[0].Env[0].Value = formatter.ReplConnInfo()
 	res.Spec.Template.Spec.Volumes[1].ConfigMap.Name = formatter.ConfigMapName()
-	pvcFormatter := util.PersistentVolumeClaimFormatter(og)
+	pvcFormatter := util.OpenGaussClusterFormatter(og)
 	res.Spec.Template.Spec.Volumes[0].PersistentVolumeClaim.ClaimName = pvcFormatter.PersistentVolumeCLaimName()
 	return
 }
@@ -153,6 +153,32 @@ func NewConfigMap(id Identity, og *v1.OpenGauss) (*unstructured.Unstructured, sc
 	configMap.SetName(formatter.ConfigMapName())
 	configMap.SetNamespace(og.Namespace)
 	return configMap, configMapRes
+}
+
+func NewMyCatConfigMap(og *v1.OpenGauss) (cm *corev1.ConfigMap) {
+	cm = configMapTemplate()
+	formatter := util.OpenGaussClusterFormatter(og)
+	cm.ObjectMeta.Name = formatter.MycatConfigMapName()
+	cm.Data["opengauss.config"] = formatter.MycatConfigMap()
+	return cm
+}
+
+// configeMapTemplate returns a configmap template of type corev1.Configmap
+func configMapTemplate() *corev1.ConfigMap {
+	template := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mycat-configmap",
+			Labels: map[string]string{
+				"app": "mycat",
+			},
+		},
+		Data: map[string]string{},
+	}
+	return template
 }
 
 // serviceTemplate returns a service template of type corev1.Service
