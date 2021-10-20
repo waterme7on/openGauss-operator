@@ -320,10 +320,10 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
-  // create mycat configmap
+        // create mycat configmap
 	mycatConfigMap := NewMyCatConfigMap(og)
 	err = c.createOrUpdateConfigMap(og.Namespace, mycatConfigMap, relicaConfigMapRes)
-  if err != nil {
+        if err != nil {
 		return err
 	}
   
