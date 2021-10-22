@@ -1,0 +1,41 @@
+apiVersion: "controller.k8s.do/v1"
+kind: OpenGauss
+metadata:
+  name: test-opengauss
+  namespace: test
+spec:
+  image: waterme7on/opengauss:debug
+  imagePullPolicy: IfNotPresent
+  resources:
+    requests:
+      storage: 2Gi
+  # storageClassName: "rook-cephfs"
+  opengauss:
+    master:
+      replicas: 1
+    worker:
+      replicas: 0
+    mycat:
+      service:
+        port: 9066
+        targetPort: 9066
+        nodePort: 30345
+      statefulset:
+        replicas: 1
+        containers:
+          image: yanglibao/mycat:v2.3
+          args:
+          - "init"
+          volumeMounts:
+            name: config
+            mountPath: /etc/config
+          ports:
+            containerPort:
+            - 8066
+            - 9066
+        volumes:
+          name: config
+          configmap:
+            name: mycat-config
+      
+    

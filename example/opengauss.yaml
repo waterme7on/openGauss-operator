@@ -16,8 +16,5 @@ spec:
     worker:
       replicas: 0
     mycat:
-      image: "nginx:latest"
       replicas: 1
-      
-      
     

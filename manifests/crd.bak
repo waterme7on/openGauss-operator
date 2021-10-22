@@ -146,13 +146,89 @@ spec:
                   mycat:
                     type: object
                     required:
-                      - replicas
+                      - service
+                      - statefulset
                     properties:
-                      replicas:
-                        type: integer
-                        format: int32
-                        minimum: 1
-                      
+                      service:
+                        type: object
+                        required:
+                          - port
+                          - targetPort
+                          - nodePort
+                        properties:
+                          port:
+                            type: integer
+                            format: int32
+                            minimum: 1
+                          targetPort:
+                            type: integer
+                            format: int32
+                            minimum: 1
+                          nodePort:
+                            type: integer
+                            format: int32
+                            minimum: 1
+                      statefulset:
+                        type: object
+                        required:
+                          - replicas
+                          - containers
+                          - volumes
+                        properties:
+                          replicas:
+                            type: integer
+                            format: int32
+                            minimum: 0
+                          containers:
+                            type: object
+                            required:
+                              - image
+                              - args
+                              - volumeMounts
+                              - ports
+                            properties:
+                              image:
+                                type: string
+                              args:
+                                type: array
+                                items:
+                                  type: string
+                              volumeMounts:
+                                type: object
+                                required:
+                                  - name
+                                  - mountPath
+                                properties:
+                                  name:
+                                    type: string
+                                  mountPath:
+                                    type: string
+                              ports:
+                                type: object
+                                required:
+                                  - containerPort
+                                properties:
+                                  containerPort:
+                                    type: array
+                                    items:
+                                      type: integer
+                                      format: int32
+                                      minimum: 1
+                          volumes:
+                            type: object
+                            required:
+                              - name
+                              - configmap
+                            properties:
+                              name:
+                                type: string
+                              configmap:
+                                type: object
+                                required:
+                                  - name
+                                properties:
+                                  name:
+                                    type: string
           status:
             type: object
             additionalProperties:

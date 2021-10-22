@@ -102,6 +102,100 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	return
 }
 
+// NewMycatService return mycat service
+func NewMycatService(og *v1.OpenGauss) (res *corev1.Service) {
+	res = serviceTemplate()
+
+	res.Name = "opengauss-mycat-service"
+	res.Labels = map[string]string{
+		"app": "opengauss-mycat",
+	}
+	res.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
+		*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGauss")),
+	}
+	res.Spec.Ports = []corev1.ServicePort{
+		{
+			Name:		"opengauss-port",
+			Port: 		9066,
+			Protocol: 	corev1.ProtocolTCP,
+			TargetPort: intstr.IntOrString{
+				IntVal: 9066,
+			},
+			NodePort: 	30345,
+		},
+	}
+	res.Spec.Selector = map[string]string{
+		"app": "opengauss-mycat",
+	}
+
+	return
+}
+
+// NewMycatStatefulset return mycat statefulset
+func NewMycatStatefulset(og *v1.OpenGauss) (res *appsv1.StatefulSet) {
+	res = statefulsetTemplate()
+	labels := map[string]string{
+		"app": "opengauss-mycat",
+	}
+
+	res.Name = "openguass-mycat-statefulset"
+	res.Namespace = og.Namespace
+	res.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
+		*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGauss")),
+	}
+	*res.Spec.Replicas = *og.Spec.OpenGauss.Mycat.Replicas
+	res.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: labels,
+	}
+	res.Spec.ServiceName = "openguass-mycat-service"
+	res.Spec.Template.ObjectMeta.Labels = labels
+	res.Spec.Template.Spec.Containers = []corev1.Container{
+		{
+			Name: "opengauss-mycat",
+			Image: "yanglibao/mycat:v2.3",
+			Args: []string{
+				"init",
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged: util.BoolPtr(true),
+			},
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "opengauss1",
+					Protocol:      corev1.ProtocolTCP,
+					ContainerPort: 8066,
+				},
+				{
+					Name:          "opengauss2",
+					Protocol:      corev1.ProtocolTCP,
+					ContainerPort: 9066,
+				},
+			},
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					MountPath: "/etc/config",
+					Name: "config",
+				},
+			},
+		},
+	}
+	res.Spec.Template.Spec.InitContainers = []corev1.Container{}
+	res.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{
+			Name: "config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "mycat-config",
+					},
+				},
+			},
+		},
+	}
+
+	return
+}
 // NewDeployment return mycat deployment object 
 func NewMycatDeployment(og *v1.OpenGauss) (res *appsv1.Deployment) {
 	res = DeploymentTemplate(og)
@@ -403,7 +497,7 @@ func DeploymentTemplate(og *v1.OpenGauss) *appsv1.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:  "mycat",
-							Image: og.Spec.OpenGauss.Mycat.Image,
+							// Image: og.Spec.OpenGauss.Mycat.Image,
 						},
 					},
 				},
