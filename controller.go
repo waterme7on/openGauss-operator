@@ -303,13 +303,6 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
-	// create or get mycat service
-	mycatSvcconfig := NewMycatService(og)
-	mycatSvc, err := c.createOrGetService(og.Namespace, mycatSvcconfig)
-	if err != nil {
-		return err
-	}
-
 	// create or get master statefulset
 	var masterStatefulset *appsv1.StatefulSet
 	masterStsConfig := NewMasterStatefulsets(og)
@@ -317,6 +310,13 @@ func (c *Controller) syncHandler(key string) error {
 	// If an error occurs during Get/Create, we'll requeue the item so we can
 	// attempt processing again later. This could have been caused by a
 	// temporary network failure, or any other transient reason.
+	if err != nil {
+		return err
+	}
+
+	// create or get master service
+	masterSvcConfig := NewMasterService(og)
+	_, err = c.createOrGetService(og.Namespace, masterSvcConfig)
 	if err != nil {
 		return err
 	}
@@ -338,6 +338,21 @@ func (c *Controller) syncHandler(key string) error {
 	if err != nil {
 		return err
 	}
+	// create or get master service
+	replicaSvcConfig := NewReplicasService(og)
+	_, err = c.createOrGetService(og.Namespace, replicaSvcConfig)
+	if err != nil {
+		return err
+	}
+
+	//
+	klog.Infof("Create or update configmap for og: %v", og.Name)
+	// create mycat configmap
+	mycatConfigMap := NewMyCatConfigMap(og)
+	err = c.createOrUpdateConfigMap(og.Namespace, mycatConfigMap, relicaConfigMapRes)
+	if err != nil {
+		return err
+	}
 
 	// create or get mycat statefulset
 	mycatStsConfig := NewMycatStatefulset(og)
@@ -346,13 +361,13 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
-	// create mycat configmap
-	mycatConfigMap := NewMyCatConfigMap(og)
-	err = c.createOrUpdateConfigMap(og.Namespace, mycatConfigMap, relicaConfigMapRes)
-        if err != nil {
+	// create or get mycat service
+	mycatSvcconfig := NewMycatService(og)
+	mycatSvc, err := c.createOrGetService(og.Namespace, mycatSvcconfig)
+	if err != nil {
 		return err
 	}
-  
+
 	// 2. check if all components are controlled by opengauss
 	// checked if statefulsets are controlled by this og resource
 	if !v1.IsControlledBy(masterStatefulset, og) {
@@ -490,7 +505,6 @@ func (c *Controller) createOrGetStatefulset(ns string, config *appsv1.StatefulSe
 	}
 	return
 }
-
 
 // createOrGetDeployment creates or get deployment of mycat
 func (c *Controller) createOrGetDeployment(ns string, config *appsv1.Deployment) (deployment *appsv1.Deployment, err error) {
