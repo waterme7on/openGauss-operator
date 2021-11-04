@@ -30,7 +30,7 @@ type OpenGaussSpec struct {
 type OpenGaussClusterConfiguration struct {
 	Master *OpenGaussStatefulSet `json:"master"` // Master Configuration
 	Worker *OpenGaussStatefulSet `json:"worker"` // Replicas Configuration
-	Mycat  *MycatStatefulSet	 `json:"mycat"`  // Mycat Configuration
+	Mycat  *MycatStatefulSet     `json:"mycat"`  // Mycat Configuration
 }
 
 type OpenGaussStatefulSet struct {
@@ -39,21 +39,21 @@ type OpenGaussStatefulSet struct {
 }
 
 type MycatStatefulSet struct {
-	Replicas	*int32 `json:"replicas"`
+	Replicas  *int32                       `json:"replicas"`
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // OpenGauss Cluster's status
 type OpenGaussStatus struct {
-	OpenGaussStatus           string   `json:"opengaussStatus"`                     // OpenGauss if ready or not
-	ReadyMaster               string   `json:"readyMaster,omitempty"`               // Ready Master number
-	ReadyReplicas             string   `json:"readyReplicas,omitempty"`             // Ready Replicas number
-	ReadyMycat				  string `json:"readyMycat,omitempty"`
+	OpenGaussStatus           string   `json:"opengaussStatus"`         // OpenGauss if ready or not
+	ReadyMaster               string   `json:"readyMaster,omitempty"`   // Ready Master number
+	ReadyReplicas             string   `json:"readyReplicas,omitempty"` // Ready Replicas number
+	ReadyMycat                string   `json:"readyMycat,omitempty"`
 	MasterStatefulset         string   `json:"masterStatefulset,omitempty"`         // name of master statefulset
 	ReplicasStatefulset       string   `json:"replicasStatefulset,omitempty"`       // name of replicas statefulset
 	PersistentVolumeClaimName string   `json:"persistentVolumeClaimName,omitempty"` // name of pvc
 	MasterIPs                 []string `json:"masterIPs,omitempty"`                 // master ips
-	ReplicasIps               []string `json:"replicasIPs,omitempty"`               // replicas ips
+	ReplicasIPs               []string `json:"replicasIPs,omitempty"`               // replicas ips
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -5,6 +5,7 @@ package util
 
 import (
 	"fmt"
+
 	v1 "github.com/waterme7on/openGauss-operator/pkg/apis/opengausscontroller/v1"
 )
 
@@ -26,15 +27,26 @@ func (formatter *openGaussClusterFormatter) MycatConfigMapName() string {
 	return formatter.OpenGauss.Name + "-mycat-cm"
 }
 
+func (formatter *openGaussClusterFormatter) MycatStatefulsetName() string {
+	return formatter.OpenGauss.Name + "-mycat-sts"
+}
+
+func (formatter *openGaussClusterFormatter) MycatServiceName() string {
+	return formatter.OpenGauss.Name + "-mycat-svc"
+}
+
 // MycatConfigMap returns mycat configs including master and replicas ip list
 func (formatter *openGaussClusterFormatter) MycatConfigMap() string {
-	ret := fmt.Sprintf("1 %s.%s 5432\n", Master(formatter.OpenGauss).ServiceName(), formatter.OpenGauss.Namespace)
-	ret = fmt.Sprintf("%s3 %s.%s 5432\n", ret, Replica(formatter.OpenGauss).ServiceName(), formatter.OpenGauss.Namespace)
-	for _, ip := range formatter.OpenGauss.Status.MasterIPs {
-		ret = fmt.Sprintf("%s1 %s 5432\n", ret, ip)
-	}
-	for _, ip := range formatter.OpenGauss.Status.ReplicasIps {
-		ret = fmt.Sprintf("%s3 %s 5432\n", ret, ip)
+	ret := ""
+	// ret := fmt.Sprintf("1 %s.%s 5432\n", Master(formatter.OpenGauss).ServiceName(), formatter.OpenGauss.Namespace)
+	// ret = fmt.Sprintf("%s3 %s.%s 5432\n", ret, Replica(formatter.OpenGauss).ServiceName(), formatter.OpenGauss.Namespace)
+	if formatter.OpenGauss.Status != nil {
+		for _, ip := range formatter.OpenGauss.Status.MasterIPs {
+			ret = fmt.Sprintf("%s1 %s 5432\n", ret, ip)
+		}
+		for _, ip := range formatter.OpenGauss.Status.ReplicasIPs {
+			ret = fmt.Sprintf("%s3 %s 5432\n", ret, ip)
+		}
 	}
 	return ret
 }

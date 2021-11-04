@@ -95,37 +95,72 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res.Spec.Template.ObjectMeta.Labels["app"] = res.Name
 	res.Spec.Template.Spec.Containers[0].Name = res.Name
 	res.Spec.Template.Spec.Containers[0].Env[0].Value = formatter.ReplConnInfo()
-	res.Spec.Template.Spec.InitContainers[0].Env[0].Value = formatter.ReplConnInfo()
+	// res.Spec.Template.Spec.InitContainers[0].Env[0].Value = formatter.ReplConnInfo()
 	res.Spec.Template.Spec.Volumes[1].ConfigMap.Name = formatter.ConfigMapName()
 	pvcFormatter := util.OpenGaussClusterFormatter(og)
 	res.Spec.Template.Spec.Volumes[0].PersistentVolumeClaim.ClaimName = pvcFormatter.PersistentVolumeCLaimName()
 	return
 }
 
+func NewMasterService(og *v1.OpenGauss) (res *corev1.Service) {
+	return NewOpengaussService(og, Master)
+}
+
+func NewReplicasService(og *v1.OpenGauss) (res *corev1.Service) {
+	return NewOpengaussService(og, Replicas)
+}
+
+func NewOpengaussService(og *v1.OpenGauss, id Identity) (res *corev1.Service) {
+	res = serviceTemplate()
+	res.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
+		*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGauss")),
+	}
+	var formatter util.StatefulsetFormatterInterface
+	switch id {
+	case Master:
+		formatter = util.Master(og)
+	case Replicas:
+		formatter = util.Replica(og)
+	default:
+		return
+	}
+	res.Name = formatter.ServiceName()
+	res.Labels["app"] = formatter.StatefulSetName()
+	res.Spec.Selector["app"] = formatter.StatefulSetName()
+	return
+}
+
 // NewMycatService return mycat service
 func NewMycatService(og *v1.OpenGauss) (res *corev1.Service) {
 	res = serviceTemplate()
-
-	res.Name = "opengauss-mycat-service"
+	formatter := util.OpenGaussClusterFormatter(og)
+	res.Name = formatter.MycatServiceName()
 	res.Labels = map[string]string{
-		"app": "opengauss-mycat",
+		"app": formatter.MycatStatefulsetName(),
 	}
 	res.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
 		*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGauss")),
 	}
 	res.Spec.Ports = []corev1.ServicePort{
 		{
-			Name:		"opengauss-port",
-			Port: 		9066,
-			Protocol: 	corev1.ProtocolTCP,
+			Name:     "mycat-port1",
+			Port:     9066,
+			Protocol: corev1.ProtocolTCP,
 			TargetPort: intstr.IntOrString{
 				IntVal: 9066,
 			},
-			NodePort: 	30345,
+		},
+		{
+			Name:     "mycat-port2",
+			Port:     8066,
+			Protocol: corev1.ProtocolTCP,
+			TargetPort: intstr.IntOrString{
+				IntVal: 8066,
+			},
 		},
 	}
 	res.Spec.Selector = map[string]string{
-		"app": "opengauss-mycat",
+		"app": formatter.MycatStatefulsetName(),
 	}
 
 	return
@@ -134,11 +169,12 @@ func NewMycatService(og *v1.OpenGauss) (res *corev1.Service) {
 // NewMycatStatefulset return mycat statefulset
 func NewMycatStatefulset(og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res = statefulsetTemplate()
+	formatter := util.OpenGaussClusterFormatter(og)
 	labels := map[string]string{
-		"app": "opengauss-mycat",
+		"app": formatter.MycatStatefulsetName(),
 	}
 
-	res.Name = "openguass-mycat-statefulset"
+	res.Name = formatter.MycatStatefulsetName()
 	res.Namespace = og.Namespace
 	res.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
 		*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGauss")),
@@ -147,11 +183,11 @@ func NewMycatStatefulset(og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: labels,
 	}
-	res.Spec.ServiceName = "openguass-mycat-service"
+	res.Spec.ServiceName = formatter.MycatServiceName()
 	res.Spec.Template.ObjectMeta.Labels = labels
 	res.Spec.Template.Spec.Containers = []corev1.Container{
 		{
-			Name: "opengauss-mycat",
+			Name:  "opengauss-mycat",
 			Image: "yanglibao/mycat:v2.3",
 			Args: []string{
 				"init",
@@ -175,7 +211,7 @@ func NewMycatStatefulset(og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 			VolumeMounts: []corev1.VolumeMount{
 				{
 					MountPath: "/etc/config",
-					Name: "config",
+					Name:      "config",
 				},
 			},
 		},
@@ -187,7 +223,7 @@ func NewMycatStatefulset(og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "mycat-config",
+						Name: formatter.MycatConfigMapName(),
 					},
 				},
 			},
@@ -196,12 +232,14 @@ func NewMycatStatefulset(og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 
 	return
 }
-// NewDeployment return mycat deployment object 
+
+// NewDeployment return mycat deployment object
 func NewMycatDeployment(og *v1.OpenGauss) (res *appsv1.Deployment) {
 	res = DeploymentTemplate(og)
 
 	return
 }
+
 type configmap struct {
 	ApiVersion string            `json:"apiVersion"`
 	Data       map[string]string `json:"data"`
@@ -298,7 +336,6 @@ func serviceTemplate() *corev1.Service {
 					TargetPort: intstr.IntOrString{
 						IntVal: 5432,
 					},
-					NodePort: 31001,
 				},
 			},
 			Selector: map[string]string{
@@ -415,7 +452,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 							Command: []string{
 								"sh",
 								"-c",
-								"cp -f /etc/postgresql.conf /etc/opengauss/postgresql.conf && cp -f /etc/pg_hba.conf /etc/opengauss/pg_hba.conf && echo $REPL_CONN_INFO >> /etc/opengauss/postgresql.conf && cat /etc/opengauss/postgresql.conf",
+								"cp -f /etc/config/postgresql.conf /etc/opengauss/postgresql.conf && cp -f /etc/config/pg_hba.conf /etc/opengauss/pg_hba.conf && cat /etc/opengauss/postgresql.conf",
 							},
 							Env: []corev1.EnvVar{
 								{
@@ -428,14 +465,9 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									MountPath: "/etc/postgresql.conf",
+									MountPath: "/etc/config/",
 									Name:      "opengauss-config",
-									SubPath:   "postgresql.conf",
-								},
-								{
-									MountPath: "/etc/pg_hba.conf",
-									Name:      "opengauss-config",
-									SubPath:   "pg_hba.conf",
+									// SubPath:   "postgresql.conf",
 								},
 								{
 									MountPath: "/etc/opengauss/",
@@ -504,7 +536,7 @@ func DeploymentTemplate(og *v1.OpenGauss) *appsv1.Deployment {
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "openguass-mycat-deployment",
+			Name:      "openguass-mycat-deployment",
 			Namespace: og.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGuass")),
@@ -522,7 +554,7 @@ func DeploymentTemplate(og *v1.OpenGauss) *appsv1.Deployment {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "mycat",
+							Name: "mycat",
 							// Image: og.Spec.OpenGauss.Mycat.Image,
 						},
 					},
