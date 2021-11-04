@@ -426,6 +426,14 @@ func (c *Controller) syncHandler(key string) error {
 			return err
 		}
 	}
+
+	// update mycat Image
+	if og.Spec.OpenGauss.Mycat.Image != mycatStsConfig.Spec.Template.Spec.Containers[0].Image {
+		mycatStatefulSet, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), mycatStsConfig, v1.UpdateOptions{})
+	}
+	if err != nil {
+		return err
+	}
 	// checked if persistent volume claims are correct
 	if *og.Spec.Resources.Requests.Storage() != *pvc.Spec.Resources.Requests.Storage() {
 		klog.V(4).Infof("Update OpenGauss pvc storage")
