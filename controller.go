@@ -349,7 +349,7 @@ func (c *Controller) syncHandler(key string) error {
 	klog.Infof("Create or update configmap for og: %v", og.Name)
 	// create mycat configmap
 	mycatConfigMap := NewMyCatConfigMap(og)
-	err = c.createOrUpdateConfigMap(og.Namespace, mycatConfigMap, relicaConfigMapRes)
+	err = c.createOrUpdateConfigMap(og.Namespace, mycatConfigMap)
 	if err != nil {
 		return err
 	}
@@ -398,13 +398,33 @@ func (c *Controller) syncHandler(key string) error {
 		// update configmap
 		masterConfigMap, masterConfigMapRes := NewMasterConfigMap(og)
 		err = c.createOrUpdateDynamicConfigMap(og.Namespace, masterConfigMap, masterConfigMapRes)
+		if err != nil {
+			return err
+		}
 		replicaConfigMap, replicaConfigMapRes := NewReplicaConfigMap(og)
 		err = c.createOrUpdateDynamicConfigMap(og.Namespace, replicaConfigMap, replicaConfigMapRes)
+		if err != nil {
+			return err
+		}
 		// update statefulset
 		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, *og.Spec.OpenGauss.Master.Replicas, *masterStatefulset.Spec.Replicas)
 		masterStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewMasterStatefulsets(og), v1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
 		klog.V(4).Infof("OpenGauss '%s' specified master replicas: %d, master statefulset Replicas %d", name, *og.Spec.OpenGauss.Worker.Replicas, *replicasStatefulset.Spec.Replicas)
 		replicasStatefulset, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewReplicaStatefulsets(og), v1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+		newMycatSts := NewMycatStatefulset(og)
+		newMycatSts.Spec.Template.Annotations = map[string]string{
+			"version/config": strconv.Itoa(int(time.Now().Unix())),
+		}
+		mycatStatefulSet, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), newMycatSts, v1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
 	}
 	// checked if persistent volume claims are correct
 	if *og.Spec.Resources.Requests.Storage() != *pvc.Spec.Resources.Requests.Storage() {
@@ -457,6 +477,24 @@ func (c *Controller) updateOpenGaussStatus(
 		mycatStatefulSet.Status.ReadyReplicas == *ogCopy.Spec.OpenGauss.Mycat.Replicas {
 		ogCopy.Status.OpenGaussStatus = "READY"
 	}
+	ogCopy.Status.MasterIPs = []string{}
+	for i := 0; i < int(*ogCopy.Spec.OpenGauss.Master.Replicas); i++ {
+		m_replicas_name := fmt.Sprintf("%v-%d", masterStatefulset.Name, i)
+		m_replicas, _ := c.kubeClientset.CoreV1().Pods(og.Namespace).Get(context.TODO(), m_replicas_name, v1.GetOptions{})
+		if m_replicas != nil && m_replicas.Status.ContainerStatuses != nil && m_replicas.Status.ContainerStatuses[0].Ready {
+			ogCopy.Status.MasterIPs = append(ogCopy.Status.MasterIPs, m_replicas.Status.PodIP)
+		}
+	}
+
+	ogCopy.Status.ReplicasIPs = []string{}
+	for i := 0; i < int(*ogCopy.Spec.OpenGauss.Worker.Replicas); i++ {
+		w_replicas_name := fmt.Sprintf("%v-%d", replicasStatefulset.Name, i)
+		w_replicas, _ := c.kubeClientset.CoreV1().Pods(og.Namespace).Get(context.TODO(), w_replicas_name, v1.GetOptions{})
+		if w_replicas != nil && w_replicas.Status.ContainerStatuses != nil && w_replicas.Status.ContainerStatuses[0].Ready {
+			ogCopy.Status.ReplicasIPs = append(ogCopy.Status.ReplicasIPs, w_replicas.Status.PodIP)
+		}
+	}
+	klog.Infof("%v, %v", ogCopy.Status.MasterIPs, ogCopy.Status.ReplicasIPs)
 	ogCopy, err = c.openGaussClientset.ControllerV1().OpenGausses(ogCopy.Namespace).UpdateStatus(context.TODO(), ogCopy, v1.UpdateOptions{})
 	if err != nil {
 		klog.Infoln("Failed to update opengauss status:", ogCopy.Name, " error:", err)
@@ -536,7 +574,7 @@ func (c *Controller) createOrUpdateDynamicConfigMap(ns string, cm *unstructured.
 }
 
 // createOrUpdateConfigMap creates or update configmap for opengauss
-func (c *Controller) createOrUpdateConfigMap(ns string, cm *corev1.ConfigMap, cmRes schema.GroupVersionResource) error {
+func (c *Controller) createOrUpdateConfigMap(ns string, cm *corev1.ConfigMap) error {
 	klog.V(4).Infoln("try to create configmap:", cm.GetName())
 	_, err := c.kubeClientset.CoreV1().ConfigMaps(ns).Create(context.TODO(), cm, v1.CreateOptions{})
 	if err != nil {

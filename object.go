@@ -95,7 +95,7 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res.Spec.Template.ObjectMeta.Labels["app"] = res.Name
 	res.Spec.Template.Spec.Containers[0].Name = res.Name
 	res.Spec.Template.Spec.Containers[0].Env[0].Value = formatter.ReplConnInfo()
-	res.Spec.Template.Spec.InitContainers[0].Env[0].Value = formatter.ReplConnInfo()
+	// res.Spec.Template.Spec.InitContainers[0].Env[0].Value = formatter.ReplConnInfo()
 	res.Spec.Template.Spec.Volumes[1].ConfigMap.Name = formatter.ConfigMapName()
 	pvcFormatter := util.OpenGaussClusterFormatter(og)
 	res.Spec.Template.Spec.Volumes[0].PersistentVolumeClaim.ClaimName = pvcFormatter.PersistentVolumeCLaimName()
@@ -452,7 +452,7 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 							Command: []string{
 								"sh",
 								"-c",
-								"cp -f /etc/postgresql.conf /etc/opengauss/postgresql.conf && cp -f /etc/pg_hba.conf /etc/opengauss/pg_hba.conf && echo $REPL_CONN_INFO >> /etc/opengauss/postgresql.conf && cat /etc/opengauss/postgresql.conf",
+								"cp -f /etc/config/postgresql.conf /etc/opengauss/postgresql.conf && cp -f /etc/config/pg_hba.conf /etc/opengauss/pg_hba.conf && cat /etc/opengauss/postgresql.conf",
 							},
 							Env: []corev1.EnvVar{
 								{
@@ -465,14 +465,9 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									MountPath: "/etc/postgresql.conf",
+									MountPath: "/etc/config/",
 									Name:      "opengauss-config",
-									SubPath:   "postgresql.conf",
-								},
-								{
-									MountPath: "/etc/pg_hba.conf",
-									Name:      "opengauss-config",
-									SubPath:   "pg_hba.conf",
+									// SubPath:   "postgresql.conf",
 								},
 								{
 									MountPath: "/etc/opengauss/",

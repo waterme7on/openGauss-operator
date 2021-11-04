@@ -155,5 +155,26 @@ spec:
                       
           status:
             type: object
-            additionalProperties:
-              type: string
+            properties:
+              masterIPs:
+                type: array
+                items:
+                  type: string
+              replicasIPs:
+                type: array
+                items:
+                  type: string
+              opengaussStatus:
+                type: string
+              readyMaster:
+                type: string
+              readyReplicas:
+                type: string
+              readyMycat:
+                type: string
+              masterStatefulset:
+                type: string
+              replicasStatefulset:
+                type: string
+              persistentVolumeClaimName:
+                type: string

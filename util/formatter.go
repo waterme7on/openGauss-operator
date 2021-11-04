@@ -37,13 +37,14 @@ func (formatter *openGaussClusterFormatter) MycatServiceName() string {
 
 // MycatConfigMap returns mycat configs including master and replicas ip list
 func (formatter *openGaussClusterFormatter) MycatConfigMap() string {
-	ret := fmt.Sprintf("1 %s.%s 5432\n", Master(formatter.OpenGauss).ServiceName(), formatter.OpenGauss.Namespace)
-	ret = fmt.Sprintf("%s3 %s.%s 5432\n", ret, Replica(formatter.OpenGauss).ServiceName(), formatter.OpenGauss.Namespace)
+	ret := ""
+	// ret := fmt.Sprintf("1 %s.%s 5432\n", Master(formatter.OpenGauss).ServiceName(), formatter.OpenGauss.Namespace)
+	// ret = fmt.Sprintf("%s3 %s.%s 5432\n", ret, Replica(formatter.OpenGauss).ServiceName(), formatter.OpenGauss.Namespace)
 	if formatter.OpenGauss.Status != nil {
 		for _, ip := range formatter.OpenGauss.Status.MasterIPs {
 			ret = fmt.Sprintf("%s1 %s 5432\n", ret, ip)
 		}
-		for _, ip := range formatter.OpenGauss.Status.ReplicasIps {
+		for _, ip := range formatter.OpenGauss.Status.ReplicasIPs {
 			ret = fmt.Sprintf("%s3 %s 5432\n", ret, ip)
 		}
 	}
