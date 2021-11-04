@@ -229,6 +229,9 @@ func NewMycatStatefulset(og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 			},
 		},
 	}
+	if og.Spec.OpenGauss.Mycat.Image != "" {
+		res.Spec.Template.Spec.Containers[0].Image = og.Spec.OpenGauss.Mycat.Image
+	}
 
 	return
 }

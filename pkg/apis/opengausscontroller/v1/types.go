@@ -40,6 +40,7 @@ type OpenGaussStatefulSet struct {
 
 type MycatStatefulSet struct {
 	Replicas  *int32                       `json:"replicas"`
+	Image     string                       `json:"image"`
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
