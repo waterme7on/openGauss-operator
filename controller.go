@@ -289,8 +289,9 @@ func (c *Controller) syncHandler(key string) error {
 
 	// 1. check if all components are deployed, includes service, configmap, master and worker statefulsets
 	// create or get pvc
-	var pvc *corev1.PersistentVolumeClaim
-	pvcConfig := NewPersistentVolumeClaim(og)
+	var pvc *corev1.PersistentVolumeClaim = nil
+	var pvcConfig *corev1.PersistentVolumeClaim = nil
+	pvcConfig = NewPersistentVolumeClaim(og)
 	pvc, err = c.createOrGetPVC(og.Namespace, pvcConfig)
 	if err != nil {
 		return err
@@ -304,8 +305,9 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	// create or get master statefulset
-	var masterStatefulset *appsv1.StatefulSet
-	masterStsConfig := NewMasterStatefulsets(og)
+	var masterStsConfig *appsv1.StatefulSet = nil
+	var masterStatefulset *appsv1.StatefulSet = nil
+	masterStsConfig = NewMasterStatefulsets(og)
 	masterStatefulset, err = c.createOrGetStatefulset(og.Namespace, masterStsConfig)
 	// If an error occurs during Get/Create, we'll requeue the item so we can
 	// attempt processing again later. This could have been caused by a
@@ -329,8 +331,9 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	// create or get replica statefulset
-	var replicasStatefulset *appsv1.StatefulSet
-	replicaStsConfig := NewReplicaStatefulsets(og)
+	var replicaStsConfig *appsv1.StatefulSet = nil
+	var replicasStatefulset *appsv1.StatefulSet = nil
+	replicaStsConfig = NewReplicaStatefulsets(og)
 	replicasStatefulset, err = c.createOrGetStatefulset(og.Namespace, replicaStsConfig)
 	// If an error occurs during Get/Create, we'll requeue the item so we can
 	// attempt processing again later. This could have been caused by a
@@ -349,14 +352,26 @@ func (c *Controller) syncHandler(key string) error {
 	klog.Infof("Create or update configmap for og: %v", og.Name)
 	// create mycat configmap
 	mycatConfigMap := NewMyCatConfigMap(og)
-	err = c.createOrUpdateConfigMap(og.Namespace, mycatConfigMap)
-	if err != nil {
-		return err
+	if og.Spec.OpenGauss.Origin == nil {
+		// for origin master, update configmap
+		err = c.createOrUpdateConfigMap(og.Namespace, mycatConfigMap)
+		if err != nil {
+			return err
+		}
+	} else {
+		// for new master, append configs to configmap
+		// cm, err := c.createOrGetConfigMap(og.Namespace, mycatConfigMap)
+		// if err != nil {
+		// 	return err
+		// }
+
 	}
 
 	// create or get mycat statefulset
-	mycatStsConfig := NewMycatStatefulset(og)
-	mycatStatefulSet, err := c.createOrGetStatefulset(og.Namespace, mycatStsConfig)
+	var mycatStsConfig *appsv1.StatefulSet = nil
+	var mycatStatefulSet *appsv1.StatefulSet = nil
+	mycatStsConfig = NewMycatStatefulset(og)
+	mycatStatefulSet, err = c.createOrGetStatefulset(og.Namespace, mycatStsConfig)
 	if err != nil {
 		return err
 	}
@@ -417,38 +432,37 @@ func (c *Controller) syncHandler(key string) error {
 		if err != nil {
 			return err
 		}
-		newMycatSts := NewMycatStatefulset(og)
-		newMycatSts.Spec.Template.Annotations = map[string]string{
-			"version/config": strconv.Itoa(int(time.Now().Unix())),
+	}
+
+	// update mycat Image if needed
+	if mycatStatefulSet != nil && og.Spec.OpenGauss.Mycat.Image != mycatStatefulSet.Spec.Template.Spec.Containers[0].Image {
+		newTs := int(time.Now().Unix())
+		oldTs, err := strconv.Atoi(mycatStatefulSet.Spec.Template.Annotations["version/config"])
+		if err != nil || newTs-oldTs >= 60 {
+			mycatStsConfig.Spec.Template.Annotations = map[string]string{
+				"version/config": strconv.Itoa(int(time.Now().Unix())),
+			}
+			mycatStatefulSet, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), mycatStsConfig, v1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
 		}
-		mycatStatefulSet, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), newMycatSts, v1.UpdateOptions{})
+	}
+	// checked if persistent volume claims are correct
+	if pvc != nil && *og.Spec.Resources.Requests.Storage() != *pvc.Spec.Resources.Requests.Storage() {
+		klog.V(4).Infof("Update OpenGauss pvc storage")
+		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Update(context.TODO(), NewPersistentVolumeClaim(og), v1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
 	}
-
-	// update mycat Image
-	if og.Spec.OpenGauss.Mycat.Image != mycatStsConfig.Spec.Template.Spec.Containers[0].Image {
-		mycatStatefulSet, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), mycatStsConfig, v1.UpdateOptions{})
-	}
-	if err != nil {
-		return err
-	}
-	// checked if persistent volume claims are correct
-	if *og.Spec.Resources.Requests.Storage() != *pvc.Spec.Resources.Requests.Storage() {
-		klog.V(4).Infof("Update OpenGauss pvc storage")
-		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Update(context.TODO(), NewPersistentVolumeClaim(og), v1.UpdateOptions{})
-	}
-	if err != nil {
-		return err
-	}
 	// check if mycat statefulset is correct
-	if *og.Spec.OpenGauss.Mycat.Replicas != *mycatStatefulSet.Spec.Replicas {
+	if mycatStatefulSet != nil && *og.Spec.OpenGauss.Mycat.Replicas != *mycatStatefulSet.Spec.Replicas {
 		klog.V(4).Infof("Openguass %s mycat deployments, expected replicas: %d, actual replicas: %d", og.Name, *og.Spec.OpenGauss.Mycat.Replicas, *mycatStatefulSet.Spec.Replicas)
 		mycatStatefulSet, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewMycatStatefulset(og), v1.UpdateOptions{})
-	}
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	// finally update opengauss resource status
@@ -478,11 +492,12 @@ func (c *Controller) updateOpenGaussStatus(
 	ogCopy.Status.ReplicasStatefulset = replicasStatefulset.Name
 	ogCopy.Status.ReadyMaster = (strconv.Itoa(int(masterStatefulset.Status.ReadyReplicas)))
 	ogCopy.Status.ReadyReplicas = (strconv.Itoa(int(replicasStatefulset.Status.ReadyReplicas)))
-	ogCopy.Status.ReadyMycat = (strconv.Itoa(int(mycatStatefulSet.Status.ReadyReplicas)))
+	if mycatStatefulSet != nil {
+		ogCopy.Status.ReadyMycat = (strconv.Itoa(int(mycatStatefulSet.Status.ReadyReplicas)))
+	}
 	ogCopy.Status.PersistentVolumeClaimName = pvc.Name
 	if (masterStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Master.Replicas &&
-		(replicasStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Worker.Replicas &&
-		mycatStatefulSet.Status.ReadyReplicas == *ogCopy.Spec.OpenGauss.Mycat.Replicas {
+		(replicasStatefulset.Status.ReadyReplicas) == *ogCopy.Spec.OpenGauss.Worker.Replicas {
 		ogCopy.Status.OpenGaussStatus = "READY"
 	}
 	ogCopy.Status.MasterIPs = []string{}
@@ -593,6 +608,20 @@ func (c *Controller) createOrUpdateConfigMap(ns string, cm *corev1.ConfigMap) er
 		klog.Infoln("failed to create or update configmap:", cm.GetName())
 	}
 	return err
+}
+
+// createOrGetConfigMap create or get configmap for og
+func (c *Controller) createOrGetConfigMap(ns string, cmConfig *corev1.ConfigMap) (cm *corev1.ConfigMap, err error) {
+	klog.V(4).Infoln("try to get configmap:", cm.Name)
+	cm, err = c.kubeClientset.CoreV1().ConfigMaps(ns).Get(context.TODO(), cmConfig.Name, v1.GetOptions{})
+	if err != nil {
+		klog.V(4).Infoln("try to create configmap:", cm.Name)
+		cm, err = c.kubeClientset.CoreV1().ConfigMaps(ns).Create(context.TODO(), cmConfig, v1.CreateOptions{})
+		if err != nil {
+			klog.Infoln("failed to create or get configmap:", cmConfig.Name)
+		}
+	}
+	return
 }
 
 // enqueueFoo takes a OpenGauss resource and converts it into a namespace/name

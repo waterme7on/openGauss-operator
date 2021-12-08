@@ -210,7 +210,7 @@ func NewMycatStatefulset(og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			VolumeMounts: []corev1.VolumeMount{
 				{
-					MountPath: "/etc/config",
+					MountPath: "/root/volume",
 					Name:      "config",
 				},
 			},
@@ -294,8 +294,14 @@ func NewMyCatConfigMap(og *v1.OpenGauss) (cm *corev1.ConfigMap) {
 	cm = configMapTemplate()
 	formatter := util.OpenGaussClusterFormatter(og)
 	cm.ObjectMeta.Name = formatter.MycatConfigMapName()
-	cm.Data["opengauss.config"] = formatter.MycatConfigMap()
+	cm.Data["host.config"] = formatter.MycatConfigMap()
+	cm.Data["table.config"] = "table1 dn1\ntable2 dn1\ntable3 dn1\n"
 	return cm
+}
+
+func AppendMyCatConfig(og *v1.OpenGauss, cm *corev1.ConfigMap) {
+	formatter := util.OpenGaussClusterFormatter(og)
+	cm.Data["host.config"] += formatter.MycatConfigMap()
 }
 
 // configeMapTemplate returns a configmap template of type corev1.Configmap

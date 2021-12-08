@@ -113,6 +113,23 @@ spec:
                         type: integer
                         format: int32
                         minimum: 0
+                  origin:
+                    type: object
+                    required:
+                      - pvc
+                      - mycatCluster
+                      - tables
+                    properties:
+                      pvc:
+                        # shared pvc betweens masters
+                        type: string
+                      mycatCluster:
+                        # shared mycat betweens masters
+                        type: string
+                      tables:
+                        type: array
+                        items:
+                          type: string
                   resources:
                     type: object
                     required:
