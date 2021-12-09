@@ -32,12 +32,12 @@ type OpenGaussClusterConfiguration struct {
 	Worker *OpenGaussStatefulSet   `json:"worker"` // Replicas Configuration
 	Mycat  *MycatStatefulSet       `json:"mycat"`  // Mycat Configuration
 	Origin *OriginOpenGaussCluster `json:"origin"` // Multi-Master shared info
+	Tables []string                `json:"tables"`
 }
 
 type OriginOpenGaussCluster struct {
-	PVC              string   `json:"pvc"`
-	MycatClusterName string   `json:"mycatCluster"`
-	Tables           []string `json:"tables"`
+	PVC              string `json:"pvc"`
+	MycatClusterName string `json:"mycatCluster"`
 }
 
 type OpenGaussStatefulSet struct {

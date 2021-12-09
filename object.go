@@ -53,6 +53,9 @@ func NewPersistentVolumeClaim(og *v1.OpenGauss) *corev1.PersistentVolumeClaim {
 			},
 		},
 	}
+	if og.Spec.OpenGauss.Origin != nil {
+		pvc.Name = og.Spec.OpenGauss.Origin.PVC
+	}
 	if og.Spec.StorageClassName != "" {
 		pvc.Spec.StorageClassName = &og.Spec.StorageClassName
 	}
@@ -175,6 +178,9 @@ func NewMycatStatefulset(og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	}
 
 	res.Name = formatter.MycatStatefulsetName()
+	if og.Spec.OpenGauss.Origin != nil {
+		res.Name = og.Spec.OpenGauss.Origin.MycatClusterName
+	}
 	res.Namespace = og.Namespace
 	res.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
 		*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGauss")),
@@ -294,14 +300,15 @@ func NewMyCatConfigMap(og *v1.OpenGauss) (cm *corev1.ConfigMap) {
 	cm = configMapTemplate()
 	formatter := util.OpenGaussClusterFormatter(og)
 	cm.ObjectMeta.Name = formatter.MycatConfigMapName()
-	cm.Data["host.config"] = formatter.MycatConfigMap()
-	cm.Data["table.config"] = "table1 dn1\ntable2 dn1\ntable3 dn1\n"
+	cm.Data[og.Name+".host"] = formatter.MycatHostConfig()
+	cm.Data[og.Name+".table"] = formatter.MycatTableConfig()
 	return cm
 }
 
 func AppendMyCatConfig(og *v1.OpenGauss, cm *corev1.ConfigMap) {
 	formatter := util.OpenGaussClusterFormatter(og)
-	cm.Data["host.config"] += formatter.MycatConfigMap()
+	cm.Data[og.Name+".host"] += formatter.MycatHostConfig()
+	cm.Data[og.Name+".table"] += formatter.MycatTableConfig()
 }
 
 // configeMapTemplate returns a configmap template of type corev1.Configmap

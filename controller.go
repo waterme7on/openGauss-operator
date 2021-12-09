@@ -73,6 +73,7 @@ type Controller struct {
 	configMapLister   corelisters.ConfigMapLister
 	configMapSynced   cache.InformerSynced
 
+	clusterList map[string]bool // existing cluster list (key format: namespace/name)
 	// workqueue is a rate limited work queue. This is used to queue work to be
 	// processed instead of performing it as soon as a change happens. This
 	// means we can ensure we only process a fixed amount of resources at a
@@ -124,6 +125,7 @@ func NewController(
 		configMapSynced:    configmapInformer.Informer().HasSynced,
 		workqueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "OpenGausses"),
 		recorder:           recorder,
+		clusterList:        map[string]bool{},
 	}
 
 	klog.Infoln("Setting up event handlers")
@@ -297,6 +299,13 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
+	if c.clusterList[key] == false {
+		if og.Spec.OpenGauss.Origin != nil {
+			c.addNewMaster()
+		}
+		c.clusterList[key] = true
+	}
+
 	// create or update master configmap
 	masterConfigMap, masterConfigMapRes := NewMasterConfigMap(og)
 	err = c.createOrUpdateDynamicConfigMap(og.Namespace, masterConfigMap, masterConfigMapRes)
@@ -360,11 +369,16 @@ func (c *Controller) syncHandler(key string) error {
 		}
 	} else {
 		// for new master, append configs to configmap
-		// cm, err := c.createOrGetConfigMap(og.Namespace, mycatConfigMap)
-		// if err != nil {
-		// 	return err
-		// }
-
+		mycatConfigMap.Name = og.Spec.OpenGauss.Origin.MycatClusterName
+		cm, err := c.createOrGetConfigMap(og.Namespace, mycatConfigMap)
+		if err != nil {
+			return err
+		}
+		AppendMyCatConfig(og, cm)
+		err = c.createOrUpdateConfigMap(og.Namespace, cm)
+		if err != nil {
+			return err
+		}
 	}
 
 	// create or get mycat statefulset
@@ -376,11 +390,18 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
-	// create or get mycat service
-	mycatSvcconfig := NewMycatService(og)
-	mycatSvc, err := c.createOrGetService(og.Namespace, mycatSvcconfig)
-	if err != nil {
-		return err
+	// create or get mycat service if this is origin master
+	if og.Spec.OpenGauss.Origin == nil {
+		mycatSvcconfig := NewMycatService(og)
+		mycatSvc, err := c.createOrGetService(og.Namespace, mycatSvcconfig)
+		if err != nil {
+			return err
+		}
+		if !v1.IsControlledBy(mycatSvc, og) {
+			msg := fmt.Sprintf(MessageResourceExists, mycatSvc.Name)
+			c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
+			return fmt.Errorf(msg)
+		}
 	}
 
 	// 2. check if all components are controlled by opengauss
@@ -397,11 +418,6 @@ func (c *Controller) syncHandler(key string) error {
 	}
 	if !v1.IsControlledBy(mycatStatefulSet, og) {
 		msg := fmt.Sprintf(MessageResourceExists, mycatStatefulSet.Name)
-		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
-		return fmt.Errorf(msg)
-	}
-	if !v1.IsControlledBy(mycatSvc, og) {
-		msg := fmt.Sprintf(MessageResourceExists, mycatSvc.Name)
 		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
 		return fmt.Errorf(msg)
 	}
@@ -523,6 +539,10 @@ func (c *Controller) updateOpenGaussStatus(
 		klog.Infoln("Failed to update opengauss status:", ogCopy.Name, " error:", err)
 	}
 	return err
+}
+
+func (c *Controller) addNewMaster() {
+
 }
 
 // createOrUpdatePVC creates or get pvc of opengauss

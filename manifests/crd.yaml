@@ -126,10 +126,10 @@ spec:
                       mycatCluster:
                         # shared mycat betweens masters
                         type: string
-                      tables:
-                        type: array
-                        items:
-                          type: string
+                  tables:
+                    type: array
+                    items:
+                      type: string
                   resources:
                     type: object
                     required:
