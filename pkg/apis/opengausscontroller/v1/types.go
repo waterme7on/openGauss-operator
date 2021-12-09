@@ -38,6 +38,7 @@ type OpenGaussClusterConfiguration struct {
 type OriginOpenGaussCluster struct {
 	PVC              string `json:"pvc"`
 	MycatClusterName string `json:"mycatCluster"`
+	Master           string `json:"master"`
 }
 
 type OpenGaussStatefulSet struct {

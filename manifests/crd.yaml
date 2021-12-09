@@ -118,13 +118,15 @@ spec:
                     required:
                       - pvc
                       - mycatCluster
-                      - tables
+                      - master
                     properties:
                       pvc:
                         # shared pvc betweens masters
                         type: string
                       mycatCluster:
                         # shared mycat betweens masters
+                        type: string
+                      master:
                         type: string
                   tables:
                     type: array

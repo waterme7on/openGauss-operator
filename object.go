@@ -307,8 +307,8 @@ func NewMyCatConfigMap(og *v1.OpenGauss) (cm *corev1.ConfigMap) {
 
 func AppendMyCatConfig(og *v1.OpenGauss, cm *corev1.ConfigMap) {
 	formatter := util.OpenGaussClusterFormatter(og)
-	cm.Data[og.Name+".host"] += formatter.MycatHostConfig()
-	cm.Data[og.Name+".table"] += formatter.MycatTableConfig()
+	cm.Data[og.Name+".host"] = formatter.MycatHostConfig()
+	cm.Data[og.Name+".table"] = formatter.MycatTableConfig()
 }
 
 // configeMapTemplate returns a configmap template of type corev1.Configmap
