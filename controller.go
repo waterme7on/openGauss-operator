@@ -307,14 +307,12 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
-	if !c.clusterList[key] {
+	if !c.clusterList[key] && og.Spec.OpenGauss.Origin != nil {
 		// a new cluster is created
 		// 1. root cluster: set true
 		// 2. leaf cluster: addNewMaster then set true
-		if og.Spec.OpenGauss.Origin != nil {
-			c.addNewMaster(og)
-		}
-		c.clusterList[key] = true
+		klog.Infof("Add a new cluster: %s", key)
+		c.addNewMaster(og)
 	}
 
 	// create or update master configmap
@@ -380,7 +378,7 @@ func (c *Controller) syncHandler(key string) error {
 		}
 	} else {
 		// for new master, append configs to configmap
-		mycatConfigMap.Name = og.Spec.OpenGauss.Origin.MycatClusterName
+		mycatConfigMap.Name = og.Spec.OpenGauss.Origin.Master + "-mycat-cm"
 		mycatConfigMap, err = c.createOrGetConfigMap(og.Namespace, mycatConfigMap)
 		if err != nil {
 			return err
@@ -391,6 +389,7 @@ func (c *Controller) syncHandler(key string) error {
 		// 	return err
 		// }
 	}
+	klog.Info("Origin Mycat:", og.Name, mycatConfigMap.Data)
 
 	// create or get mycat statefulset
 	var mycatStsConfig *appsv1.StatefulSet = nil
@@ -413,6 +412,11 @@ func (c *Controller) syncHandler(key string) error {
 			c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
 			return fmt.Errorf(msg)
 		}
+		if !v1.IsControlledBy(mycatStatefulSet, og) {
+			msg := fmt.Sprintf(MessageResourceExists, mycatStatefulSet.Name)
+			c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
+			return fmt.Errorf(msg)
+		}
 	}
 
 	// 2. check if all components are controlled by opengauss
@@ -424,11 +428,6 @@ func (c *Controller) syncHandler(key string) error {
 	}
 	if !v1.IsControlledBy(replicasStatefulset, og) {
 		msg := fmt.Sprintf(MessageResourceExists, replicasStatefulset.Name)
-		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
-		return fmt.Errorf(msg)
-	}
-	if !v1.IsControlledBy(mycatStatefulSet, og) {
-		msg := fmt.Sprintf(MessageResourceExists, mycatStatefulSet.Name)
 		c.recorder.Event(og, corev1.EventTypeWarning, ErrResourceExists, msg)
 		return fmt.Errorf(msg)
 	}
@@ -462,7 +461,7 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	// update mycat Image if needed
-	if mycatStatefulSet != nil && og.Spec.OpenGauss.Mycat.Image != mycatStatefulSet.Spec.Template.Spec.Containers[0].Image {
+	if og.Spec.OpenGauss.Origin == nil && mycatStatefulSet != nil && og.Spec.OpenGauss.Mycat.Image != mycatStatefulSet.Spec.Template.Spec.Containers[0].Image {
 		newTs := int(time.Now().Unix())
 		oldTs, err := strconv.Atoi(mycatStatefulSet.Spec.Template.Annotations["version/config"])
 		if err != nil || newTs-oldTs >= 60 {
@@ -476,7 +475,7 @@ func (c *Controller) syncHandler(key string) error {
 		}
 	}
 	// checked if persistent volume claims are correct
-	if pvc != nil && *og.Spec.Resources.Requests.Storage() != *pvc.Spec.Resources.Requests.Storage() {
+	if og.Spec.OpenGauss.Origin == nil && pvc != nil && *og.Spec.Resources.Requests.Storage() != *pvc.Spec.Resources.Requests.Storage() {
 		klog.V(4).Infof("Update OpenGauss pvc storage")
 		pvc, err = c.kubeClientset.CoreV1().PersistentVolumeClaims(og.Namespace).Update(context.TODO(), NewPersistentVolumeClaim(og), v1.UpdateOptions{})
 		if err != nil {
@@ -484,7 +483,7 @@ func (c *Controller) syncHandler(key string) error {
 		}
 	}
 	// check if mycat statefulset is correct
-	if mycatStatefulSet != nil && *og.Spec.OpenGauss.Mycat.Replicas != *mycatStatefulSet.Spec.Replicas {
+	if og.Spec.OpenGauss.Origin == nil && mycatStatefulSet != nil && *og.Spec.OpenGauss.Mycat.Replicas != *mycatStatefulSet.Spec.Replicas {
 		klog.V(4).Infof("Openguass %s mycat deployments, expected replicas: %d, actual replicas: %d", og.Name, *og.Spec.OpenGauss.Mycat.Replicas, *mycatStatefulSet.Spec.Replicas)
 		mycatStatefulSet, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), NewMycatStatefulset(og), v1.UpdateOptions{})
 		if err != nil {
@@ -500,6 +499,9 @@ func (c *Controller) syncHandler(key string) error {
 
 	// record normal event
 	c.recorder.Event(og, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
+	if !c.clusterList[key] {
+		c.clusterList[key] = true
+	}
 	return nil
 }
 
@@ -533,7 +535,7 @@ func (c *Controller) updateOpenGaussStatus(
 	for i := 0; i < int(*ogCopy.Spec.OpenGauss.Master.Replicas); i++ {
 		m_replicas_name := fmt.Sprintf("%v-%d", masterStatefulset.Name, i)
 		m_replicas, _ := c.kubeClientset.CoreV1().Pods(og.Namespace).Get(context.TODO(), m_replicas_name, v1.GetOptions{})
-		if m_replicas != nil && m_replicas.Status.ContainerStatuses != nil && m_replicas.Status.ContainerStatuses[0].Ready {
+		if m_replicas != nil && m_replicas.Status.ContainerStatuses != nil {
 			ogCopy.Status.MasterIPs = append(ogCopy.Status.MasterIPs, m_replicas.Status.PodIP)
 		}
 	}
@@ -542,18 +544,23 @@ func (c *Controller) updateOpenGaussStatus(
 	for i := 0; i < int(*ogCopy.Spec.OpenGauss.Worker.Replicas); i++ {
 		w_replicas_name := fmt.Sprintf("%v-%d", replicasStatefulset.Name, i)
 		w_replicas, _ := c.kubeClientset.CoreV1().Pods(og.Namespace).Get(context.TODO(), w_replicas_name, v1.GetOptions{})
-		if w_replicas != nil && w_replicas.Status.ContainerStatuses != nil && w_replicas.Status.ContainerStatuses[0].Ready {
+		if w_replicas != nil && w_replicas.Status.ContainerStatuses != nil {
 			ogCopy.Status.ReplicasIPs = append(ogCopy.Status.ReplicasIPs, w_replicas.Status.PodIP)
 		}
 	}
-	if og.Status.ReadyReplicas != ogCopy.Status.ReadyReplicas || (replicasStatefulset.Status.ReadyReplicas) != (*og.Spec.OpenGauss.Worker.Replicas) || og.Status.ReadyMaster != ogCopy.Status.ReadyMaster || (masterStatefulset.Status.ReadyReplicas) != (*og.Spec.OpenGauss.Master.Replicas) {
+	AppendMyCatConfig(ogCopy, mycatConfigMap)
+	err = c.createOrUpdateConfigMap(og.Namespace, mycatConfigMap)
+	klog.V(4).Infof("mycat config: %s", mycatConfigMap.Data)
+	if err != nil {
+		klog.V(4).Infof("Create or update configmap error: %s", err)
+		return err
+	}
+	if (replicasStatefulset.Status.ReadyReplicas) != (*og.Spec.OpenGauss.Worker.Replicas) || (masterStatefulset.Status.ReadyReplicas) != (*og.Spec.OpenGauss.Master.Replicas) || !c.clusterList[og.Namespace+"/"+og.Name] || (og.Status != nil && (og.Status.ReadyReplicas != ogCopy.Status.ReadyReplicas || og.Status.ReadyMaster != ogCopy.Status.ReadyMaster)) {
 		klog.Infof("Update mycat config: %s", og.Name)
 		go func() {
 			time.Sleep(time.Second * 30)
-			AppendMyCatConfig(ogCopy, mycatConfigMap)
-			c.createOrUpdateConfigMap(og.Namespace, mycatConfigMap)
 			klog.Infof("Reload mycat: %s", og.Name)
-			err = c.reloadMycatConfig(ogCopy)
+			err = c.reloadMycatConfig(og)
 			if err != nil {
 				klog.Infof("Reload mycat error:%s", err)
 			}
@@ -587,7 +594,7 @@ func (c *Controller) execCmd(ns string, pod string, cmd *[]string) error {
 		Stdout: &stdout,
 		Stderr: &stderr,
 	})
-	klog.Info(stdout.String())
+	klog.Info("execommand:", stdout.String())
 	return err
 }
 
@@ -597,6 +604,9 @@ func (c *Controller) reloadMycatConfig(og *opengaussv1.OpenGauss) error {
 	time.Sleep(time.Second * 60)
 	formatter := util.OpenGaussClusterFormatter(og)
 	mycatSts := formatter.MycatStatefulsetName()
+	if og.Spec.OpenGauss.Origin != nil {
+		mycatSts = og.Spec.OpenGauss.Origin.MycatClusterName
+	}
 	for i := 0; i < int(*og.Spec.OpenGauss.Mycat.Replicas); i++ {
 		mycatPod := fmt.Sprintf("%s-%d", mycatSts, i)
 		command := ("/root/config/updateConfig.sh")
@@ -619,7 +629,7 @@ func (c *Controller) reloadMycatHost(og *opengaussv1.OpenGauss) error {
 	mycatSts := og.Spec.OpenGauss.Origin.MycatClusterName
 	for i := 0; i < int(*og.Spec.OpenGauss.Mycat.Replicas); i++ {
 		mycatPod := fmt.Sprintf("%s-%d", mycatSts, i)
-		command := fmt.Sprintf("/root/config/addHost.sh %s", og.Name)
+		command := fmt.Sprintf("/root/config/addHost.sh %s", og.Spec.OpenGauss.Origin.Master)
 		cmd := []string{
 			"bash",
 			"-c",
@@ -635,7 +645,7 @@ func (c *Controller) reloadMycatHost(og *opengaussv1.OpenGauss) error {
 
 // doCheckpoint
 func (c *Controller) doCheckpoint(og *opengaussv1.OpenGauss) error {
-	masterSts := og.Spec.OpenGauss.Origin.Master
+	masterSts := og.Spec.OpenGauss.Origin.Master + "-masters"
 	for i := 0; i < 1; i++ { // TODO
 		masterPod := fmt.Sprintf("%s-%d", masterSts, i)
 		command := ("/root/checkpoint.sh")
@@ -654,11 +664,13 @@ func (c *Controller) doCheckpoint(og *opengaussv1.OpenGauss) error {
 
 func (c *Controller) addNewMaster(og *opengaussv1.OpenGauss) error {
 	// 1. remove root cluster route
+	klog.Infof("Reload mycat host config:%s", og.Name)
 	err := c.reloadMycatHost(og)
 	if err != nil {
 		return err
 	}
 	// 2. check point
+	klog.Infof("Origin master do checkpoint:%s", og.Name)
 	err = c.doCheckpoint(og)
 	if err != nil {
 		return err
@@ -703,9 +715,9 @@ func (c *Controller) createOrGetStatefulset(ns string, config *appsv1.StatefulSe
 		// (try to) create pvc
 		klog.V(4).Infoln("try to create statefulset for opengauss:", config.Name)
 		sts, err = c.kubeClientset.AppsV1().StatefulSets(ns).Create(context.TODO(), config, v1.CreateOptions{})
-	}
-	if err != nil {
-		klog.V(4).Infoln(config.Spec)
+		if err != nil {
+			klog.V(4).Infoln(config.Spec)
+		}
 	}
 	return
 }

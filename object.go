@@ -102,6 +102,9 @@ func NewStatefulsets(id Identity, og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 	res.Spec.Template.Spec.Volumes[1].ConfigMap.Name = formatter.ConfigMapName()
 	pvcFormatter := util.OpenGaussClusterFormatter(og)
 	res.Spec.Template.Spec.Volumes[0].PersistentVolumeClaim.ClaimName = pvcFormatter.PersistentVolumeCLaimName()
+	if og.Spec.OpenGauss.Origin != nil {
+		res.Spec.Template.Spec.Volumes[0].PersistentVolumeClaim.ClaimName = og.Spec.OpenGauss.Origin.PVC
+	}
 	return
 }
 
