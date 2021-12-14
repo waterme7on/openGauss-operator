@@ -296,11 +296,17 @@ func NewConfigMap(id Identity, og *v1.OpenGauss) (*unstructured.Unstructured, sc
 	configMapRes := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
 	configMap.SetName(formatter.ConfigMapName())
 	configMap.SetNamespace(og.Namespace)
+	configMap.SetOwnerReferences([]metav1.OwnerReference{
+		*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGauss")),
+	})
 	return configMap, configMapRes
 }
 
 func NewMyCatConfigMap(og *v1.OpenGauss) (cm *corev1.ConfigMap) {
 	cm = configMapTemplate()
+	cm.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
+		*metav1.NewControllerRef(og, v1.SchemeGroupVersion.WithKind("OpenGauss")),
+	}
 	formatter := util.OpenGaussClusterFormatter(og)
 	cm.ObjectMeta.Name = formatter.MycatConfigMapName()
 	cm.Data[og.Name+".host"] = formatter.MycatHostConfig()

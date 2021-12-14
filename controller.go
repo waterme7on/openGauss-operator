@@ -389,7 +389,6 @@ func (c *Controller) syncHandler(key string) error {
 		// 	return err
 		// }
 	}
-	klog.Info("Origin Mycat:", og.Name, mycatConfigMap.Data)
 
 	// create or get mycat statefulset
 	var mycatStsConfig *appsv1.StatefulSet = nil
@@ -555,16 +554,14 @@ func (c *Controller) updateOpenGaussStatus(
 		klog.V(4).Infof("Create or update configmap error: %s", err)
 		return err
 	}
-	if (replicasStatefulset.Status.ReadyReplicas) != (*og.Spec.OpenGauss.Worker.Replicas) || (masterStatefulset.Status.ReadyReplicas) != (*og.Spec.OpenGauss.Master.Replicas) || !c.clusterList[og.Namespace+"/"+og.Name] || (og.Status != nil && (og.Status.ReadyReplicas != ogCopy.Status.ReadyReplicas || og.Status.ReadyMaster != ogCopy.Status.ReadyMaster)) {
+	if !c.clusterList[og.Namespace+"/"+og.Name] || (og.Status != nil && (og.Status.ReadyReplicas != ogCopy.Status.ReadyReplicas || og.Status.ReadyMaster != ogCopy.Status.ReadyMaster)) {
 		klog.Infof("Update mycat config: %s", og.Name)
-		go func() {
-			time.Sleep(time.Second * 30)
-			klog.Infof("Reload mycat: %s", og.Name)
-			err = c.reloadMycatConfig(og)
-			if err != nil {
-				klog.Infof("Reload mycat error:%s", err)
-			}
-		}()
+		time.Sleep(SyncInterval)
+		klog.Infof("Reload mycat: %s", og.Name)
+		err = c.restartMycat(og)
+		if err != nil {
+			klog.Infof("Reload mycat error:%s", err)
+		}
 	}
 	klog.Infof("%v, %v", ogCopy.Status.MasterIPs, ogCopy.Status.ReplicasIPs)
 	ogCopy, err = c.openGaussClientset.ControllerV1().OpenGausses(ogCopy.Namespace).UpdateStatus(context.TODO(), ogCopy, v1.UpdateOptions{})
@@ -594,7 +591,7 @@ func (c *Controller) execCmd(ns string, pod string, cmd *[]string) error {
 		Stdout: &stdout,
 		Stderr: &stderr,
 	})
-	klog.Info("execommand:", stdout.String())
+	klog.V(4).Info("execommand:", stdout.String())
 	return err
 }
 
@@ -623,6 +620,36 @@ func (c *Controller) reloadMycatConfig(og *opengaussv1.OpenGauss) error {
 	return nil
 }
 
+// restartMycat
+func (c *Controller) restartMycat(og *opengaussv1.OpenGauss) error {
+	mycatSts := ""
+	if og.Spec.OpenGauss.Origin == nil {
+		formatter := util.OpenGaussClusterFormatter(og)
+		mycatSts = formatter.MycatStatefulsetName()
+	} else {
+		mycatSts = og.Spec.OpenGauss.Origin.MycatClusterName
+	}
+	mycat, err := c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Get(context.TODO(), mycatSts, v1.GetOptions{})
+	if err != nil {
+		klog.Infof("restartMycat - get mycat %s:%s error %s", og.Name, mycatSts, err)
+		return err
+	}
+	oldVersion := -1
+	if mycat.Spec.Template.Annotations != nil {
+		oldVersion, err = strconv.Atoi(mycat.Spec.Template.Annotations["version/config"])
+	}
+	newVersion := int(time.Now().Unix())
+	if err == nil && newVersion-oldVersion <= MycatRestartInterval {
+		klog.V(4).Infof("mycat restart too soon: old version %d, new version %d", oldVersion, newVersion)
+		return nil
+	}
+	mycat.Spec.Template.Annotations = map[string]string{
+		"version/config": strconv.Itoa(newVersion),
+	}
+	_, err = c.kubeClientset.AppsV1().StatefulSets(og.Namespace).Update(context.TODO(), mycat, v1.UpdateOptions{})
+	return err
+}
+
 // reloadMycatConfig when add/remove master/worker
 func (c *Controller) reloadMycatHost(og *opengaussv1.OpenGauss) error {
 	// wait to sync configmap to mounted volume in pod
@@ -648,7 +675,7 @@ func (c *Controller) doCheckpoint(og *opengaussv1.OpenGauss) error {
 	masterSts := og.Spec.OpenGauss.Origin.Master + "-masters"
 	for i := 0; i < 1; i++ { // TODO
 		masterPod := fmt.Sprintf("%s-%d", masterSts, i)
-		command := ("/root/checkpoint.sh")
+		command := ("/checkpoint.sh")
 		cmd := []string{
 			"bash",
 			"-c",
