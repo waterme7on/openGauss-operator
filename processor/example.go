@@ -18,8 +18,11 @@ import (
 )
 
 var (
-	serverAddr = flag.String("server_addr", "localhost:17173", "The server address in the format of host:port")
-	address    = "http://10.77.50.201:31111"
+	serverAddr    = flag.String("server_addr", "localhost:17173", "The server address in the format of host:port")
+	address       = "http://10.77.50.201:31111"
+	runtime       = time.Minute * 30  // 测试时间
+	scaleInterval = time.Second * 300 // 弹性伸缩间隔
+	isScale       = false             // 是否开启弹性伸缩
 )
 
 func main() {
@@ -50,7 +53,7 @@ func main() {
 		WorkerReplication:  response.WorkerReplication,
 	}
 
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute*30)
+	ctx, cancel := context.WithTimeout(context.TODO(), runtime)
 	defer cancel()
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -69,7 +72,7 @@ func run(ctx context.Context, scaleRequest *pb.ScaleRequest, client pb.OpenGauss
 	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
 	defer file.Close()
 	write := bufio.NewWriter(file)
-	// lastScaleTime := time.Now()
+	lastScaleTime := time.Now()
 	if err != nil {
 		log.Fatalf("Cannot connect to prometheus: %s, %s", address, err.Error())
 	}
@@ -92,32 +95,37 @@ func run(ctx context.Context, scaleRequest *pb.ScaleRequest, client pb.OpenGauss
 			for _, v := range m {
 				percentage, _ := strconv.ParseFloat(v, 64)
 				fmt.Println("Cluster Cpu Usage", percentage)
+				// ----------start-----------
+				// 弹性伸缩相关代码：
 				// 发起rpc调用
-				// if percentage > 50 {
-				// 	scaleRequest.WorkerReplication += 1
-				// 	if time.Since(lastScaleTime) < 300*time.Second {
-				// 		continue
-				// 	}
-				// 	response, err := client.Scale(context.TODO(), scaleRequest)
-				// 	if err != nil {
-				// 		log.Fatal(err)
-				// 	}
-				// 	log.Print(response)
-				// }
-				// if percentage < 5 {
-				// 	if scaleRequest.WorkerReplication <= 0 {
-				// 		continue
-				// 	}
-				// 	if time.Since(lastScaleTime) < 300*time.Second {
-				// 		continue
-				// 	}
-				// 	scaleRequest.WorkerReplication = (scaleRequest.WorkerReplication - 1)
-				// 	response, err := client.Scale(context.TODO(), scaleRequest)
-				// 	if err != nil {
-				// 		log.Fatal(err)
-				// 	}
-				// 	log.Print(response)
-				// }
+				if isScale {
+					if percentage > 50 {
+						scaleRequest.WorkerReplication += 1
+						if time.Since(lastScaleTime) < scaleInterval {
+							continue
+						}
+						response, err := client.Scale(context.TODO(), scaleRequest)
+						if err != nil {
+							log.Fatal(err)
+						}
+						log.Print(response)
+					}
+					if percentage < 5 {
+						if scaleRequest.WorkerReplication <= 0 {
+							continue
+						}
+						if time.Since(lastScaleTime) < scaleInterval {
+							continue
+						}
+						scaleRequest.WorkerReplication = (scaleRequest.WorkerReplication - 1)
+						response, err := client.Scale(context.TODO(), scaleRequest)
+						if err != nil {
+							log.Fatal(err)
+						}
+						log.Print(response)
+					}
+				}
+				// ----------end-----------
 			}
 			result, err = prometheusUtil.QueryClusterNumber("a", queryClient)
 			if err != nil {
