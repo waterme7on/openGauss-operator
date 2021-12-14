@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/prometheus/common/model"
 	pb "github.com/waterme7on/openGauss-operator/rpc/protobuf"
@@ -15,17 +19,13 @@ import (
 
 var (
 	serverAddr = flag.String("server_addr", "localhost:17173", "The server address in the format of host:port")
+	address    = "http://10.77.50.201:31111"
 )
 
 func main() {
 	// skeleton code
 	// 连接prometheus Client
 	// address := "http://10.77.50.201:30364"
-	address := "http://10.77.50.201:31111"
-	_, queryClient, err := prometheusUtil.GetPrometheusClient(address)
-	if err != nil {
-		log.Fatalf("Cannot connect to prometheus: %s, %s", address, err.Error())
-	}
 	// 连接grpc server
 	flag.Parse()
 	var opts []grpc.DialOption
@@ -39,49 +39,99 @@ func main() {
 	defer conn.Close()
 	// 建立客户端
 	client := pb.NewOpenGaussControllerClient(conn)
-	// TODO:
-	// 查询: util/prometheusUtil/prometheusQuerys.go
-	result, err := prometheusUtil.QueryPodCpuUsagePercentage("test-opengauss", queryClient)
+	// 获取集群的初始信息
+	request := &pb.GetRequest{
+		OpenGaussObjectKey: "test/a",
+	}
+	response, _ := client.Get(context.TODO(), request)
+	scaleRequest := &pb.ScaleRequest{
+		OpenGaussObjectKey: "test/a",
+		MasterReplication:  response.MasterReplication,
+		WorkerReplication:  response.WorkerReplication,
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute*30)
+	defer cancel()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		run(ctx, scaleRequest, client)
+		defer wg.Done()
+	}()
+	log.Print("Wait for process done")
+	wg.Wait()
+	log.Print("Done")
+}
+
+func run(ctx context.Context, scaleRequest *pb.ScaleRequest, client pb.OpenGaussControllerClient) {
+	_, queryClient, err := prometheusUtil.GetPrometheusClient(address)
+	filePath := "slots.txt"
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
+	defer file.Close()
+	write := bufio.NewWriter(file)
+	// lastScaleTime := time.Now()
 	if err != nil {
-		log.Fatalf("Cannot query prometheus: %s, %s", address, err.Error())
+		log.Fatalf("Cannot connect to prometheus: %s, %s", address, err.Error())
 	}
-	// 返回map[string]string
-	m := extractResult(&result)
-	fmt.Println(m)
-	// 输出如：map[{pod="prometheus-6d75d99cb9-lx8w2"}:4.93641914680743 {pod="prometheus-adapter-5b8db7955f-6zs2j"}:0 {pod="prometheus-adapter-5b8db7955f-ktp2k"}:3.571457910076159 {pod="prometheus-k8s-0"}:311.1957729587634 {pod="prometheus-operator-75d9b475d9-955fv"}:0.6592752119650527]
-	// key: {pod="prometheus-6d75d99cb9-lx8w2"}
-	// value: 4.93641914680743
-	// 均为string
-	for k, v := range m {
-		fmt.Println(k)
-		fmt.Println(v)
+	for {
+		time.Sleep(5 * time.Second)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			result, err := prometheusUtil.QueryClusterCpuUsagePercentage("a", queryClient)
+			if err != nil {
+				log.Fatalf("Cannot query prometheus: %s, %s", address, err.Error())
+			}
+			// 返回map[string]string
+			m := extractResult(&result)
+			// 输出如：map[{pod="prometheus-6d75d99cb9-lx8w2"}:4.93641914680743 {pod="prometheus-adapter-5b8db7955f-6zs2j"}:0 {pod="prometheus-adapter-5b8db7955f-ktp2k"}:3.571457910076159 {pod="prometheus-k8s-0"}:311.1957729587634 {pod="prometheus-operator-75d9b475d9-955fv"}:0.6592752119650527]
+			// key: {pod="prometheus-6d75d99cb9-lx8w2"}
+			// value: 4.93641914680743
+			// 均为string
+			for _, v := range m {
+				percentage, _ := strconv.ParseFloat(v, 64)
+				fmt.Println("Cluster Cpu Usage", percentage)
+				// 发起rpc调用
+				// if percentage > 50 {
+				// 	scaleRequest.WorkerReplication += 1
+				// 	if time.Since(lastScaleTime) < 300*time.Second {
+				// 		continue
+				// 	}
+				// 	response, err := client.Scale(context.TODO(), scaleRequest)
+				// 	if err != nil {
+				// 		log.Fatal(err)
+				// 	}
+				// 	log.Print(response)
+				// }
+				// if percentage < 5 {
+				// 	if scaleRequest.WorkerReplication <= 0 {
+				// 		continue
+				// 	}
+				// 	if time.Since(lastScaleTime) < 300*time.Second {
+				// 		continue
+				// 	}
+				// 	scaleRequest.WorkerReplication = (scaleRequest.WorkerReplication - 1)
+				// 	response, err := client.Scale(context.TODO(), scaleRequest)
+				// 	if err != nil {
+				// 		log.Fatal(err)
+				// 	}
+				// 	log.Print(response)
+				// }
+			}
+			result, err = prometheusUtil.QueryClusterNumber("a", queryClient)
+			if err != nil {
+				log.Fatalf("Cannot query prometheus: %s, %s", address, err.Error())
+			}
+			// 返回map[string]string
+			m = extractResult(&result)
+			for _, v := range m {
+				write.WriteString(fmt.Sprintf("%v,%v\n", time.Now().Unix(), v))
+			}
+			write.Flush()
+		}
 	}
-	if percentage, _ := strconv.ParseFloat(m["{pod=\"prometheus-operator-75d9b475d9-955fv\"}"], 64); percentage > 0 {
-		fmt.Println("test scale out")
-		request := &pb.ScaleRequest{
-			OpenGaussObjectKey: "test/test-opengauss",
-			MasterReplication:  1,
-			WorkerReplication:  2,
-		}
-		response, err := client.Scale(context.TODO(), request)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Print(response)
-	}
-	if percentage, _ := strconv.ParseFloat(m["xxx"], 64); percentage > 50 {
-		// 示例如果cpu利用率大于50，则发起Scale调用
-		// 发起rpc调用
-		request := &pb.ScaleRequest{
-			OpenGaussObjectKey: "test/test-opengauss",
-			MasterReplication:  1,
-		}
-		response, err := client.Scale(context.TODO(), request)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Print(response)
-	}
+
 }
 
 func extractResult(v *model.Value) (m map[string]string) {

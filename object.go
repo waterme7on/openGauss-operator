@@ -13,6 +13,7 @@ import (
 	"github.com/waterme7on/openGauss-operator/util"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -418,6 +419,12 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 									Name:          "opengauss",
 									Protocol:      corev1.ProtocolTCP,
 									ContainerPort: 5432,
+								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("1000m"),
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
 								},
 							},
 							Env: []corev1.EnvVar{
