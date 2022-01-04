@@ -1,3 +1,5 @@
+// 通过修改runtime, scaleInterval, isScale配置实验参数
+
 package main
 
 import (
@@ -18,11 +20,12 @@ import (
 )
 
 var (
-	serverAddr    = flag.String("server_addr", "localhost:17173", "The server address in the format of host:port")
-	address       = "http://10.77.50.201:31111"
-	runtime       = time.Minute * 30  // 测试时间
-	scaleInterval = time.Second * 300 // 弹性伸缩间隔
-	isScale       = false             // 是否开启弹性伸缩
+	serverAddr     = flag.String("server_addr", "localhost:17173", "The server address in the format of host:port")
+	address        = "http://10.77.50.201:31111"
+	runtime        = time.Minute * 360 // 测试时间
+	scaleInterval  = time.Second * 300 // 弹性伸缩间隔
+	adjustInterval = time.Second * 5   // 获取CPU利用率间隔
+	isScale        = true              // 是否开启弹性伸缩
 )
 
 func main() {
@@ -69,7 +72,7 @@ func main() {
 func run(ctx context.Context, scaleRequest *pb.ScaleRequest, client pb.OpenGaussControllerClient) {
 	_, queryClient, err := prometheusUtil.GetPrometheusClient(address)
 	filePath := "slots.txt"
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	defer file.Close()
 	write := bufio.NewWriter(file)
 	lastScaleTime := time.Now()
@@ -77,21 +80,18 @@ func run(ctx context.Context, scaleRequest *pb.ScaleRequest, client pb.OpenGauss
 		log.Fatalf("Cannot connect to prometheus: %s, %s", address, err.Error())
 	}
 	for {
-		time.Sleep(5 * time.Second)
+		time.Sleep(adjustInterval)
 		select {
 		case <-ctx.Done():
 			return
 		default:
+			// 获得第一个集群的平均CPU利用率，以判断是否伸缩备机
 			result, err := prometheusUtil.QueryClusterCpuUsagePercentage("a", queryClient)
 			if err != nil {
 				log.Fatalf("Cannot query prometheus: %s, %s", address, err.Error())
 			}
 			// 返回map[string]string
 			m := extractResult(&result)
-			// 输出如：map[{pod="prometheus-6d75d99cb9-lx8w2"}:4.93641914680743 {pod="prometheus-adapter-5b8db7955f-6zs2j"}:0 {pod="prometheus-adapter-5b8db7955f-ktp2k"}:3.571457910076159 {pod="prometheus-k8s-0"}:311.1957729587634 {pod="prometheus-operator-75d9b475d9-955fv"}:0.6592752119650527]
-			// key: {pod="prometheus-6d75d99cb9-lx8w2"}
-			// value: 4.93641914680743
-			// 均为string
 			for _, v := range m {
 				percentage, _ := strconv.ParseFloat(v, 64)
 				fmt.Println("Cluster Cpu Usage", percentage)
@@ -99,24 +99,30 @@ func run(ctx context.Context, scaleRequest *pb.ScaleRequest, client pb.OpenGauss
 				// 弹性伸缩相关代码：
 				// 发起rpc调用
 				if isScale {
-					if percentage > 50 {
-						scaleRequest.WorkerReplication += 1
+					fmt.Println("last scaletime ", lastScaleTime)
+					if percentage > 80 {
+						if scaleRequest.WorkerReplication >= 4 {
+							continue
+						}
 						if time.Since(lastScaleTime) < scaleInterval {
 							continue
 						}
+						lastScaleTime = time.Now()
+						scaleRequest.WorkerReplication += 1
 						response, err := client.Scale(context.TODO(), scaleRequest)
 						if err != nil {
 							log.Fatal(err)
 						}
 						log.Print(response)
 					}
-					if percentage < 5 {
+					if percentage < 50 {
 						if scaleRequest.WorkerReplication <= 0 {
 							continue
 						}
 						if time.Since(lastScaleTime) < scaleInterval {
 							continue
 						}
+						lastScaleTime = time.Now()
 						scaleRequest.WorkerReplication = (scaleRequest.WorkerReplication - 1)
 						response, err := client.Scale(context.TODO(), scaleRequest)
 						if err != nil {
@@ -142,6 +148,11 @@ func run(ctx context.Context, scaleRequest *pb.ScaleRequest, client pb.OpenGauss
 
 }
 
+// 返回查询结果
+// 输出如：map[{pod="prometheus-6d75d99cb9-lx8w2"}:4.93641914680743 {pod="prometheus-adapter-5b8db7955f-6zs2j"}:0 {pod="prometheus-adapter-5b8db7955f-ktp2k"}:3.571457910076159 {pod="prometheus-k8s-0"}:311.1957729587634 {pod="prometheus-operator-75d9b475d9-955fv"}:0.6592752119650527]
+// key: {pod="prometheus-6d75d99cb9-lx8w2"}
+// value: 4.93641914680743
+// 均为string
 func extractResult(v *model.Value) (m map[string]string) {
 	switch (*v).(type) {
 	case model.Vector:

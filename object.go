@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	v1 "github.com/waterme7on/openGauss-operator/pkg/apis/opengausscontroller/v1"
 	"github.com/waterme7on/openGauss-operator/util"
@@ -21,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/klog/v2"
 )
 
 // Identity represents the type of statefulsets
@@ -65,12 +67,37 @@ func NewPersistentVolumeClaim(og *v1.OpenGauss) *corev1.PersistentVolumeClaim {
 
 // NewMasterStatefulsets returns master statefulset object
 func NewMasterStatefulsets(og *v1.OpenGauss) (sts *appsv1.StatefulSet) {
-	return NewStatefulsets(Master, og)
+	sts = NewStatefulsets(Master, og)
+	klog.V(4).Info(og.Spec.Resources.Limits)
+	if og.Spec.Resources != nil && og.Spec.Resources.Limits != nil {
+		res := og.Spec.Resources
+		if res.Limits.Cpu() != nil {
+			sts.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU] = *res.Limits.Cpu()
+		}
+		if res.Limits.Memory() != nil {
+			sts.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceMemory] = *res.Limits.Memory()
+		}
+	}
+	return
 }
 
 // NewReplicaStatefulsets returns replica statefulset object
 func NewReplicaStatefulsets(og *v1.OpenGauss) (sts *appsv1.StatefulSet) {
-	return NewStatefulsets(Replicas, og)
+	sts = NewStatefulsets(Replicas, og)
+	klog.V(4).Info(og.Spec.Resources)
+	if og.Spec.Resources != nil && og.Spec.Resources.Limits != nil {
+		res := og.Spec.Resources
+		if res.Limits.Cpu() != nil {
+			sts.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU] = *res.Limits.Cpu()
+		}
+		if res.Limits.Memory() != nil {
+			sts.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceMemory] = *res.Limits.Memory()
+		}
+	}
+	if strings.Contains(og.Spec.Image, "base") {
+		sts.Spec.Template.Spec.Volumes[0].PersistentVolumeClaim.ClaimName += "-r"
+	}
+	return
 }
 
 // NewStatefulsets returns a statefulset object according to id
@@ -217,6 +244,16 @@ func NewMycatStatefulset(og *v1.OpenGauss) (res *appsv1.StatefulSet) {
 					ContainerPort: 9066,
 				},
 			},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("2000m"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+				// Limits: corev1.ResourceList{
+				// 	corev1.ResourceCPU:    resource.MustParse("2000m"),
+				// 	corev1.ResourceMemory: resource.MustParse("4Gi"),
+				// },
+			},
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			VolumeMounts: []corev1.VolumeMount{
 				{
@@ -321,6 +358,11 @@ func AppendMyCatConfig(og *v1.OpenGauss, cm *corev1.ConfigMap) {
 	cm.Data[og.Name+".table"] = formatter.MycatTableConfig()
 }
 
+func CleanMyCatConfig(og *v1.OpenGauss, cm *corev1.ConfigMap) {
+	cm.Data[og.Name+".host"] = ""
+	cm.Data[og.Name+".table"] = ""
+}
+
 // configeMapTemplate returns a configmap template of type corev1.Configmap
 func configMapTemplate() *corev1.ConfigMap {
 	template := &corev1.ConfigMap{
@@ -414,6 +456,15 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 							SecurityContext: &corev1.SecurityContext{
 								Privileged: util.BoolPtr(true),
 							},
+							Lifecycle: &corev1.Lifecycle{
+								PreStop: &corev1.Handler{
+									Exec: &corev1.ExecAction{
+										Command: []string{
+											"bash", "-c", "/checkpoint.sh",
+										},
+									},
+								},
+							},
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "opengauss",
@@ -422,8 +473,8 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 								},
 							},
 							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("1000m"),
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("1500m"),
 									corev1.ResourceMemory: resource.MustParse("2Gi"),
 								},
 							},
@@ -505,6 +556,12 @@ func statefulsetTemplate() *appsv1.StatefulSet {
 									MountPath: "/etc/opengauss/",
 									Name:      "config-dir",
 									// SubPath:   "",
+								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("1000m"),
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
 								},
 							},
 						},

@@ -143,6 +143,7 @@ func NewController(
 		UpdateFunc: func(old, new interface{}) {
 			controller.enqueueOpenGauss(new)
 		},
+		DeleteFunc: controller.cleanConfig,
 	})
 
 	deploymentInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -554,7 +555,7 @@ func (c *Controller) updateOpenGaussStatus(
 		klog.V(4).Infof("Create or update configmap error: %s", err)
 		return err
 	}
-	if !c.clusterList[og.Namespace+"/"+og.Name] || (og.Status != nil && (og.Status.ReadyReplicas != ogCopy.Status.ReadyReplicas || og.Status.ReadyMaster != ogCopy.Status.ReadyMaster)) {
+	if (!c.clusterList[og.Namespace+"/"+og.Name] || (og.Status != nil && (og.Status.ReadyReplicas != ogCopy.Status.ReadyReplicas || og.Status.ReadyMaster != ogCopy.Status.ReadyMaster))) && replicasStatefulset.Status.ReadyReplicas == *og.Spec.OpenGauss.Worker.Replicas {
 		klog.Infof("Update mycat config: %s", og.Name)
 		time.Sleep(SyncInterval)
 		klog.Infof("Reload mycat: %s", og.Name)
@@ -687,6 +688,25 @@ func (c *Controller) doCheckpoint(og *opengaussv1.OpenGauss) error {
 		}
 	}
 	return nil
+}
+
+func (c *Controller) cleanConfig(obj interface{}) {
+	var object opengaussv1.OpenGauss
+	var ok bool
+	if object, ok = obj.(opengaussv1.OpenGauss); !ok {
+		return
+	}
+	mycat := object.Name + "-mycat-cm"
+	if object.Spec.OpenGauss.Origin != nil {
+		mycat = object.Spec.OpenGauss.Origin.Master + "-mycat-cm"
+	}
+	cm, err := c.kubeClientset.CoreV1().ConfigMaps(object.Namespace).Get(context.TODO(), mycat, v1.GetOptions{})
+	if err != nil {
+		return
+	}
+	AppendMyCatConfig(&object, cm)
+	c.createOrUpdateConfigMap(object.Namespace, cm)
+	return
 }
 
 func (c *Controller) addNewMaster(og *opengaussv1.OpenGauss) error {
