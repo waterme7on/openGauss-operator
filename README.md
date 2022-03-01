@@ -64,6 +64,14 @@ Check status
 kubectl get all | grep opengauss
 ```
 
+Add new master
+
+```sh
+# connect to mycat with mysql client, default user "mycat" and password "123456"
+# create table using mysql client
+
+# example in example/opengauss.yaml and example/opengauss-new-master.yaml
+```
 
 ## 2. Structure
 
