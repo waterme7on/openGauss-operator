@@ -28,9 +28,17 @@ type OpenGaussSpec struct {
 
 // Define OpenGauss's needs for master and replicas
 type OpenGaussClusterConfiguration struct {
-	Master *OpenGaussStatefulSet `json:"master"` // Master Configuration
-	Worker *OpenGaussStatefulSet `json:"worker"` // Replicas Configuration
-	Mycat  *MycatStatefulSet     `json:"mycat"`  // Mycat Configuration
+	Master *OpenGaussStatefulSet   `json:"master"` // Master Configuration
+	Worker *OpenGaussStatefulSet   `json:"worker"` // Replicas Configuration
+	Mycat  *MycatStatefulSet       `json:"mycat"`  // Mycat Configuration
+	Origin *OriginOpenGaussCluster `json:"origin"` // Multi-Master shared info
+	Tables []string                `json:"tables"`
+}
+
+type OriginOpenGaussCluster struct {
+	PVC              string `json:"pvc"`
+	MycatClusterName string `json:"mycatCluster"`
+	Master           string `json:"master"`
 }
 
 type OpenGaussStatefulSet struct {

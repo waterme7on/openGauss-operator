@@ -35,17 +35,28 @@ func (formatter *openGaussClusterFormatter) MycatServiceName() string {
 	return formatter.OpenGauss.Name + "-mycat-svc"
 }
 
-// MycatConfigMap returns mycat configs including master and replicas ip list
-func (formatter *openGaussClusterFormatter) MycatConfigMap() string {
+func (formatter *openGaussClusterFormatter) MycatTableConfig() string {
 	ret := ""
+	if formatter.OpenGauss.Spec.OpenGauss.Tables != nil {
+		for _, table := range formatter.OpenGauss.Spec.OpenGauss.Tables {
+			ret = fmt.Sprintf("%s%s\n", ret, table)
+		}
+	}
+	return ret
+}
+
+// MycatConfigMap returns mycat configs including master and replicas ip list
+func (formatter *openGaussClusterFormatter) MycatHostConfig() string {
+	// ret := ""
 	// ret := fmt.Sprintf("1 %s.%s 5432\n", Master(formatter.OpenGauss).ServiceName(), formatter.OpenGauss.Namespace)
 	// ret = fmt.Sprintf("%s3 %s.%s 5432\n", ret, Replica(formatter.OpenGauss).ServiceName(), formatter.OpenGauss.Namespace)
+	ret := ""
 	if formatter.OpenGauss.Status != nil {
 		for _, ip := range formatter.OpenGauss.Status.MasterIPs {
 			ret = fmt.Sprintf("%s1 %s 5432\n", ret, ip)
 		}
 		for _, ip := range formatter.OpenGauss.Status.ReplicasIPs {
-			ret = fmt.Sprintf("%s3 %s 5432\n", ret, ip)
+			ret = fmt.Sprintf("%s2 %s 5432\n", ret, ip)
 		}
 	}
 	return ret

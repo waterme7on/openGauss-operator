@@ -89,6 +89,18 @@ spec:
                     properties:
                       storage:
                           type: string
+                  limits:
+                    type: object
+                    required:
+                      - cpu
+                      - memory
+                    properties:
+                      cpu:
+                        type: string
+                        pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                      memory:
+                        type: string
+                        pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
               opengauss:
                 type: object
                 required:
@@ -113,6 +125,25 @@ spec:
                         type: integer
                         format: int32
                         minimum: 0
+                  origin:
+                    type: object
+                    required:
+                      - pvc
+                      - mycatCluster
+                      - master
+                    properties:
+                      pvc:
+                        # shared pvc betweens masters
+                        type: string
+                      mycatCluster:
+                        # shared mycat betweens masters
+                        type: string
+                      master:
+                        type: string
+                  tables:
+                    type: array
+                    items:
+                      type: string
                   resources:
                     type: object
                     required:

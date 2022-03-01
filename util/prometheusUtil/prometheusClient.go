@@ -45,3 +45,25 @@ func QueryPodMemoryUsagePercentage(podPrefix string, client *prometheus.API) (mo
 	value, _, err := (*client).Query(context.TODO(), fmt.Sprintf(PodMemoryUsagePercentage, podPrefix), time.Now())
 	return value, err
 }
+
+func QueryClusterNumber(cluster string, client *prometheus.API) (model.Value, error) {
+	value, _, err := (*client).Query(context.TODO(), fmt.Sprintf(ClusterNum, cluster), time.Now())
+	return value, err
+}
+
+func QueryMasterCpuUsagePercentage(cluster string, client *prometheus.API) (model.Value, error) {
+	value, _, err := (*client).Query(context.TODO(), fmt.Sprintf(MasterCpuUsagePercentage, cluster, cluster), time.Now())
+	return value, err
+}
+func QueryWorkerCpuUsagePercentage(cluster string, client *prometheus.API) (model.Value, error) {
+	value, _, err := (*client).Query(context.TODO(), fmt.Sprintf(WorkerCpuUsagePercentage, cluster, cluster), time.Now())
+	return value, err
+}
+func QueryClusterCpuUsagePercentage(cluster string, client *prometheus.API) (model.Value, error) {
+	value, _, err := (*client).Query(context.TODO(), fmt.Sprintf(ClusterCpuUsagePercentage, cluster, cluster), time.Now())
+	return value, err
+}
+func QueryClusterMemoryUsagePercentage(cluster string, client *prometheus.API) (model.Value, error) {
+	value, _, err := (*client).Query(context.TODO(), fmt.Sprintf(ClusterMemoryUsagePercentage, cluster, cluster), time.Now())
+	return value, err
+}
