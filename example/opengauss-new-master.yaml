@@ -1,7 +1,7 @@
 apiVersion: controller.k8s.do/v1
 kind: OpenGauss
 metadata:
-  name: a
+  name: b
   namespace: test
 spec:
   image: ructrx/og-ivld-buf2:1.0.1
@@ -11,13 +11,17 @@ spec:
       replicas: 1
     mycat:
       image: yanglibao/mycat:v7.3
-      replicas: 2
+      replicas: 1
+    origin:
+      mycatCluster: a-mycat-sts
+      pvc: b-pvc
+      master: a
     tables:
-    - sbtest1
-    - sbtest2
-    - sbtest3
-    - sbtest4
-    - sbtest5
+    - sbtest6
+    - sbtest7
+    - sbtest8
+    - sbtest9
+    - sbtest10
     worker:
       replicas: 4
   storageClassName: rook-cephfs
